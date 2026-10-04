@@ -32,7 +32,9 @@ writes it:
 - [Digitraffic Live](https://github.com/jesmak/digitraffic_live): Finnish railway stations, optionally only the
   trains that stop at another station later, such as Helsinki → Tampere.
 
-A template entity can write the format too.
+Integrations that write the format carry the GitHub topic
+[`departures-card-source`](https://github.com/topics/departures-card-source), so that's where to look for more. If
+you make one, give its repository the topic too. A template entity can write the format as well.
 
 ## Options
 
