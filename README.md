@@ -17,9 +17,13 @@ Hey dude! Help me out for a couple of :beers: or a :coffee:!
 
 ## What is it?
 
+<img src="docs/images/station-with-notice.png" alt="Trains leaving a railway station: the next one large with its track, the rest below, and a track works notice above them" width="500">
+
 A custom card that shows when the next bus, tram or train leaves. Each stop is a section of its own: the next
 departure large, with its line, destination and a countdown, and the ones after it as rows below. Several stops fit
 in one card, such as both sides of a street, and they sit side by side when the card is wide enough.
+
+<img src="docs/images/two-stops-side-by-side.png" alt="A bus stop and a railway station side by side in one card, each with its next departure large and the following ones below" width="800">
 
 The card reads sensors in the [departures format](docs/departures-format.md), so it works with any integration that
 writes it:
