@@ -1,0 +1,6 @@
+{
+    "name": "Departures card",
+    "render_readme": true,
+    "filename": "departures-card.js",
+    "homeassistant": "2026.9.3"
+}

@@ -1,0 +1,33 @@
+{
+    "common": {
+        "name": "Departures",
+        "description": "The next departures from bus stops and railway stations",
+        "invalid_configuration": "Invalid configuration: add at least one departures sensor",
+        "no_entity": "Entity not found:",
+        "not_departures": "is not a departures sensor",
+        "unavailable": "Departures are not available right now",
+        "no_departures": "No upcoming departures",
+        "now": "Now",
+        "min": "min",
+        "cancelled": "Cancelled",
+        "track": "Track",
+        "platform": "Platform",
+        "realtime": "Real-time estimate",
+        "scheduled": "Scheduled"
+    },
+    "editor": {
+        "title": "Title",
+        "entities": "Stops",
+        "entities_helper": "Departures sensors, each shown as a section of its own. Both sides of a street fit in one card.",
+        "entity": "Departures sensor",
+        "name": "Name",
+        "name_helper": "Replaces the stop's own name",
+        "subtitle": "Subtitle",
+        "subtitle_helper": "Such as the direction: towards the centre",
+        "departures": "Departures per stop",
+        "departures_helper": "The next one large and the rest below it",
+        "show_cancelled": "Show cancelled departures",
+        "show_notices": "Show notices",
+        "show_notices_helper": "Track works and other notices for the whole stop, under its name"
+    }
+}

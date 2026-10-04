@@ -1,0 +1,33 @@
+{
+    "common": {
+        "name": "Lähdöt",
+        "description": "Seuraavat lähdöt pysäkeiltä ja rautatieasemilta",
+        "invalid_configuration": "Virheellinen konfiguraatio. Lisää vähintään yksi lähtösensori.",
+        "no_entity": "Entiteettiä ei ole:",
+        "not_departures": "ei ole lähtösensori",
+        "unavailable": "Lähtötiedot eivät ole juuri nyt saatavilla",
+        "no_departures": "Ei tulevia lähtöjä",
+        "now": "Nyt",
+        "min": "min",
+        "cancelled": "Peruttu",
+        "track": "Raide",
+        "platform": "Laituri",
+        "realtime": "Reaaliaikainen arvio",
+        "scheduled": "Aikataulun mukaan"
+    },
+    "editor": {
+        "title": "Otsikko",
+        "entities": "Pysäkit",
+        "entities_helper": "Lähtösensorit, kukin omana osionaan. Kadun molemmat puolet mahtuvat samaan korttiin.",
+        "entity": "Lähtösensori",
+        "name": "Nimi",
+        "name_helper": "Korvaa pysäkin oman nimen",
+        "subtitle": "Lisäotsikko",
+        "subtitle_helper": "Esimerkiksi suunta, keskustaan päin",
+        "departures": "Lähtöjä pysäkiltä",
+        "departures_helper": "Seuraava isona ja loput sen alla",
+        "show_cancelled": "Näytä perutut lähdöt",
+        "show_notices": "Näytä tiedotteet",
+        "show_notices_helper": "Ratatyöt ja muut koko pysäkkiä koskevat tiedotteet sen nimen alla"
+    }
+}
