@@ -1,4 +1,4 @@
-/*! departures-card 1.0.0 | MIT License */
+/*! departures-card 1.0.1 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,7 +711,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.0.0";
+var CARD_VERSION = "1.0.1";
 var DEPARTURES_VERSION = 1;
 var DEFAULT_DEPARTURES = 4;
 var GONE_AFTER_MS = 6e4;
@@ -796,7 +796,7 @@ var en_default = {
   common: {
     name: "Departures",
     description: "The next departures from bus stops and railway stations",
-    invalid_configuration: "Invalid configuration: add at least one departures sensor",
+    invalid_configuration: "Invalid configuration. Add at least one departures sensor",
     no_entity: "Entity not found:",
     not_departures: "is not a departures sensor",
     unavailable: "Departures are not available right now",
@@ -817,7 +817,7 @@ var en_default = {
     name: "Name",
     name_helper: "Replaces the stop's own name",
     subtitle: "Subtitle",
-    subtitle_helper: "Such as the direction: towards the centre",
+    subtitle_helper: "Such as the direction, towards the centre",
     departures: "Departures per stop",
     departures_helper: "The next one large and the rest below it",
     show_cancelled: "Show cancelled departures",

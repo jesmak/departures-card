@@ -1,6 +1,6 @@
 {
     "name": "departures-card",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Home Assistant dashboard card for the next departures from bus stops and railway stations, from any sensor in the departures format",
     "keywords": [
         "home-assistant",
