@@ -107,6 +107,8 @@ entities:
 - **Notices:** a notice about the departure itself, such as "Passengers are directed to train S 106", and the stop's
   own notices, such as track works with buses replacing trains, shown in full under its name.
 
+<img src="docs/images/stop-with-alerts.png" alt="A bus stop with its own notice under its name, the next departure large with a line notice in full, and the rows below with the same notice cut short on the lines it concerns" width="500">
+
 Clicking a stop's name opens its sensor.
 
 ## Colours
