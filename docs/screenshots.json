@@ -1,0 +1,195 @@
+{
+    "clock": "2026-10-14T07:40:00+03:00",
+    "states": {
+        "sensor.keskustori_tke0001": {
+            "state": "2026-10-14T07:42:00+03:00",
+            "attributes": {
+                "friendly_name": "Keskustori",
+                "device_class": "timestamp",
+                "departures_version": 1,
+                "stop_name": "Keskustori",
+                "stop_code": "0001",
+                "attribution": "Digitransit, CC BY 4.0",
+                "departures": [
+                    {
+                        "id": "trip:example:3_0741",
+                        "line": "3",
+                        "mode": "bus",
+                        "headsign": "Hervanta",
+                        "scheduled": "2026-10-14T07:41:00+03:00",
+                        "estimated": "2026-10-14T07:42:00+03:00",
+                        "realtime": true,
+                        "delay": 60,
+                        "color": "#1b57a7"
+                    },
+                    {
+                        "id": "trip:example:1_0746",
+                        "line": "1",
+                        "mode": "tram",
+                        "headsign": "Pyynikintori",
+                        "scheduled": "2026-10-14T07:46:00+03:00",
+                        "estimated": "2026-10-14T07:46:00+03:00",
+                        "realtime": true,
+                        "color": "#da2128"
+                    },
+                    {
+                        "id": "trip:example:8_0750",
+                        "line": "8",
+                        "mode": "bus",
+                        "headsign": "Atala",
+                        "scheduled": "2026-10-14T07:50:00+03:00",
+                        "estimated": "2026-10-14T07:53:00+03:00",
+                        "realtime": true,
+                        "delay": 180,
+                        "color": "#1b57a7"
+                    },
+                    {
+                        "id": "trip:example:25_0812",
+                        "line": "25",
+                        "mode": "bus",
+                        "headsign": "Kaukajärvi",
+                        "scheduled": "2026-10-14T08:52:00+03:00",
+                        "estimated": "2026-10-14T08:52:00+03:00",
+                        "color": "#1b57a7"
+                    }
+                ]
+            }
+        },
+        "sensor.hameenkatu_tke0002": {
+            "state": "2026-10-14T07:44:00+03:00",
+            "attributes": {
+                "friendly_name": "Hämeenkatu",
+                "device_class": "timestamp",
+                "departures_version": 1,
+                "stop_name": "Hämeenkatu",
+                "stop_code": "0002",
+                "attribution": "Digitransit, CC BY 4.0",
+                "notices": ["The stop moves 50 m east during street works until 31 October."],
+                "departures": [
+                    {
+                        "id": "trip:example:2_0744",
+                        "line": "2",
+                        "mode": "bus",
+                        "headsign": "Rauhaniemi",
+                        "scheduled": "2026-10-14T07:44:00+03:00",
+                        "estimated": "2026-10-14T07:44:00+03:00",
+                        "realtime": true,
+                        "notice": "Diverted via Satakunnankatu because of street works",
+                        "color": "#1b57a7"
+                    },
+                    {
+                        "id": "trip:example:2_0754",
+                        "line": "2",
+                        "mode": "bus",
+                        "headsign": "Rauhaniemi",
+                        "scheduled": "2026-10-14T07:54:00+03:00",
+                        "estimated": "2026-10-14T07:55:00+03:00",
+                        "realtime": true,
+                        "delay": 60,
+                        "notice": "Diverted via Satakunnankatu because of street works",
+                        "color": "#1b57a7"
+                    },
+                    {
+                        "id": "trip:example:12_0758",
+                        "line": "12",
+                        "mode": "bus",
+                        "headsign": "Lamminpää",
+                        "scheduled": "2026-10-14T07:58:00+03:00",
+                        "estimated": "2026-10-14T07:58:00+03:00",
+                        "color": "#1b57a7"
+                    },
+                    {
+                        "id": "trip:example:1_0801",
+                        "line": "1",
+                        "mode": "tram",
+                        "headsign": "Hervantajärvi",
+                        "scheduled": "2026-10-14T08:01:00+03:00",
+                        "estimated": "2026-10-14T08:01:00+03:00",
+                        "realtime": true,
+                        "color": "#da2128"
+                    }
+                ]
+            }
+        },
+        "sensor.tampere_station": {
+            "state": "2026-10-14T07:47:00+03:00",
+            "attributes": {
+                "friendly_name": "Tampere",
+                "device_class": "timestamp",
+                "departures_version": 1,
+                "stop_name": "Tampere",
+                "stop_id": "TPE",
+                "attribution": "Fintraffic / digitraffic.fi, CC BY 4.0",
+                "notices": ["Track works between Tampere and Lempäälä. Some trains leave from track 1."],
+                "departures": [
+                    {
+                        "id": "train:2026-10-14/45",
+                        "line": "IC 45",
+                        "mode": "train",
+                        "headsign": "Oulu",
+                        "scheduled": "2026-10-14T07:43:00+03:00",
+                        "estimated": "2026-10-14T07:47:00+03:00",
+                        "realtime": true,
+                        "delay": 240,
+                        "platform": "3"
+                    },
+                    {
+                        "id": "train:2026-10-14/172",
+                        "line": "S 172",
+                        "mode": "train",
+                        "headsign": "Helsinki",
+                        "scheduled": "2026-10-14T07:55:00+03:00",
+                        "estimated": "2026-10-14T07:55:00+03:00",
+                        "realtime": true,
+                        "platform": "1"
+                    },
+                    {
+                        "id": "train:2026-10-14/R12",
+                        "line": "R",
+                        "mode": "train",
+                        "headsign": "Riihimäki",
+                        "scheduled": "2026-10-14T08:04:00+03:00",
+                        "estimated": "2026-10-14T08:04:00+03:00",
+                        "platform": "2",
+                        "cancelled": true,
+                        "notice": "Rolling stock"
+                    },
+                    {
+                        "id": "train:2026-10-14/266",
+                        "line": "IC 266",
+                        "mode": "train",
+                        "headsign": "Turku",
+                        "scheduled": "2026-10-14T08:20:00+03:00",
+                        "estimated": "2026-10-14T08:20:00+03:00",
+                        "platform": "4"
+                    }
+                ]
+            }
+        }
+    },
+    "shots": [
+        {
+            "name": "one-stop",
+            "width": 500,
+            "card": { "type": "custom:departures-card", "entities": ["sensor.keskustori_tke0001"] }
+        },
+        {
+            "name": "station",
+            "width": 500,
+            "card": { "type": "custom:departures-card", "entities": ["sensor.tampere_station"] }
+        },
+        {
+            "name": "two-stops",
+            "width": 800,
+            "card": {
+                "type": "custom:departures-card",
+                "entities": [{ "entity": "sensor.keskustori_tke0001", "subtitle": "towards Hervanta" }, "sensor.tampere_station"]
+            }
+        },
+        {
+            "name": "stop-with-notices",
+            "width": 500,
+            "card": { "type": "custom:departures-card", "entities": ["sensor.hameenkatu_tke0002"] }
+        }
+    ]
+}
