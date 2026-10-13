@@ -6,14 +6,10 @@ departures format.
 [![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![HACS][hacs-shield]][hacs] [![License][license-shield]](LICENSE)
 
 <p>
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/one-stop-dark.png">
-  <img src="docs/images/one-stop-light.png" width="400" alt="A bus stop, the next bus large with its countdown and delay, and three trams and buses after it">
-</picture>
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/station-dark.png">
-  <img src="docs/images/station-light.png" width="400" alt="A railway station with a track works notice, the next train large with its track, and a cancelled train among the ones after it">
-</picture>
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/one-stop-light.png#gh-light-mode-only" width="400" alt="A bus stop, the next bus large with its countdown and delay, and three trams and buses after it">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/one-stop-dark.png#gh-dark-mode-only" width="400" alt="A bus stop, the next bus large with its countdown and delay, and three trams and buses after it">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/station-light.png#gh-light-mode-only" width="400" alt="A railway station with a track works notice, the next train large with its track, and a cancelled train among the ones after it">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/station-dark.png#gh-dark-mode-only" width="400" alt="A railway station with a track works notice, the next train large with its track, and a cancelled train among the ones after it">
 </p>
 
 ## What is it?
@@ -22,10 +18,8 @@ A custom card that shows when the next bus, tram or train leaves. Each stop is a
 departure large, its line, destination and a countdown, and the ones after it as rows below. Several stops fit in one
 card, such as both sides of a street, and they sit side by side when the card is wide enough.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/two-stops-dark.png">
-  <img src="docs/images/two-stops-light.png" width="810" alt="A bus stop and a railway station side by side in one card, each with its next departure large and the following ones below">
-</picture>
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/two-stops-light.png#gh-light-mode-only" width="810" alt="A bus stop and a railway station side by side in one card, each with its next departure large and the following ones below">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/two-stops-dark.png#gh-dark-mode-only" width="810" alt="A bus stop and a railway station side by side in one card, each with its next departure large and the following ones below">
 
 The card reads sensors in the [departures format](docs/departures-format.md), so it works with any integration that
 writes it:
@@ -89,10 +83,8 @@ Everything can be set in the card's visual editor.
 - **Notices:** a notice about the departure itself, such as "Passengers are directed to train S 106", and the stop's
   own notices, such as track works with buses replacing trains, shown in full under its name.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/stop-with-notices-dark.png">
-  <img src="docs/images/stop-with-notices-light.png" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice in full, and the rows below with the same notice cut short on the lines it concerns">
-</picture>
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-light.png#gh-light-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice in full, and the rows below with the same notice cut short on the lines it concerns">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-dark.png#gh-dark-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice in full, and the rows below with the same notice cut short on the lines it concerns">
 
 Clicking a stop's name opens its sensor.
 
