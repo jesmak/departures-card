@@ -5,16 +5,16 @@ departures format.
 
 [![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![HACS][hacs-shield]][hacs] [![License][license-shield]](LICENSE)
 
-<table><tr>
-<td><picture>
+<p>
+<picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/one-stop-dark.png">
   <img src="docs/images/one-stop-light.png" width="400" alt="A bus stop, the next bus large with its countdown and delay, and three trams and buses after it">
-</picture></td>
-<td><picture>
+</picture>
+<picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/station-dark.png">
   <img src="docs/images/station-light.png" width="400" alt="A railway station with a track works notice, the next train large with its track, and a cancelled train among the ones after it">
-</picture></td>
-</tr></table>
+</picture>
+</p>
 
 ## What is it?
 
@@ -24,7 +24,7 @@ card, such as both sides of a street, and they sit side by side when the card is
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/two-stops-dark.png">
-  <img src="docs/images/two-stops-light.png" width="800" alt="A bus stop and a railway station side by side in one card, each with its next departure large and the following ones below">
+  <img src="docs/images/two-stops-light.png" width="810" alt="A bus stop and a railway station side by side in one card, each with its next departure large and the following ones below">
 </picture>
 
 The card reads sensors in the [departures format](docs/departures-format.md), so it works with any integration that
@@ -91,7 +91,7 @@ Everything can be set in the card's visual editor.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/stop-with-notices-dark.png">
-  <img src="docs/images/stop-with-notices-light.png" width="500" alt="A bus stop with its own notice under its name, the next departure large with a line notice in full, and the rows below with the same notice cut short on the lines it concerns">
+  <img src="docs/images/stop-with-notices-light.png" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice in full, and the rows below with the same notice cut short on the lines it concerns">
 </picture>
 
 Clicking a stop's name opens its sensor.
