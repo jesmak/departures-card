@@ -20,6 +20,8 @@ export interface DeparturesCardConfig extends LovelaceCardConfig {
     show_cancelled?: boolean;
     /** The stop's notices, such as track works, are shown under its name unless this is false. */
     show_notices?: boolean;
+    /** The subtitle and the notices in the rows wrap in full instead of being cut short. */
+    full_texts?: boolean;
 }
 
 /** One departure, as docs/departures-format.md describes it. */

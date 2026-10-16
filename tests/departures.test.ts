@@ -80,6 +80,12 @@ describe("times", () => {
         expect(dayLabel("2026-10-06T03:15:00Z", NOW, "en", "Europe/Helsinki")).toBe("Tue");
         expect(dayLabel("2026-10-12T03:15:00Z", NOW, "fi", "Europe/Helsinki")).toBe("12.10.");
         expect(dayLabel("2026-10-04T21:05:00Z", NOW, "fi", "UTC")).toBe("");
+        // A week on is a date, six days on still a weekday.
+        expect(dayLabel("2026-10-10T09:00:00Z", NOW, "fi", "Europe/Helsinki")).toBe("la");
+        expect(dayLabel("2026-10-11T09:00:00Z", NOW, "fi", "Europe/Helsinki")).toBe("11.10.");
+        // A departure gone just before midnight is shown for a minute after it, without yesterday's date.
+        const justAfterMidnight = Date.parse("2026-10-04T21:00:20Z");
+        expect(dayLabel("2026-10-04T20:59:50Z", justAfterMidnight, "fi", "Europe/Helsinki")).toBe("");
     });
 
     it("are written the way the language writes them", () => {

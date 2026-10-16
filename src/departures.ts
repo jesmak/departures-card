@@ -1,5 +1,5 @@
 /** Reading departures sensors, and the times and colours the card shows for them. */
-import { DEPARTURES_VERSION, GONE_AFTER_MS, MODES } from "./const";
+import { DEPARTURES_VERSION, GONE_AFTER_MS, MODE_COLORS } from "./const";
 import type { HassEntity, HomeAssistant } from "./hass";
 import type { Departure, SectionConfig } from "./types";
 
@@ -83,22 +83,20 @@ export function clock(time: string, language: string, timeZone?: string): string
 }
 
 /**
- * The day of a time that isn't today, for putting in front of its clock time: the weekday within a week ("ma",
- * "Mon"), the date further off ("12.10."), and nothing for today. Days are counted where the clock times are shown.
+ * The day of a time that isn't today, for putting in front of its clock time: the weekday within the next six days
+ * ("ma", "Mon"), the date from a week on ("12.10."), and nothing for today. Days are counted where the clock times
+ * are shown.
  */
 export function dayLabel(time: string, now: number, language: string, timeZone?: string): string {
     const date = (value: Date | number) => new Intl.DateTimeFormat("en-CA", { timeZone }).format(value);
     const day = date(new Date(time));
-    if (day === date(now)) {
+    const daysAway = (Date.parse(`${day}T00:00:00Z`) - Date.parse(`${date(now)}T00:00:00Z`)) / 86_400_000;
+    // A departure gone a moment before midnight is still shown for a minute after it, as yesterday's needs no day.
+    if (daysAway <= 0) {
         return "";
     }
-    const daysAway = (Date.parse(`${day}T00:00:00Z`) - Date.parse(`${date(now)}T00:00:00Z`)) / 86_400_000;
-    const options: Intl.DateTimeFormatOptions = daysAway > 0 && daysAway < 7 ? { weekday: "short" } : { day: "numeric", month: "numeric" };
+    const options: Intl.DateTimeFormatOptions = daysAway < 7 ? { weekday: "short" } : { day: "numeric", month: "numeric" };
     return new Intl.DateTimeFormat(language, { ...options, timeZone }).format(new Date(time));
-}
-
-export function modeOf(departure: Departure): { icon: string; color: string } {
-    return MODES[departure.mode] ?? MODES.other;
 }
 
 const HEX_COLOR = /^#([0-9a-f]{6})$/i;
@@ -107,7 +105,7 @@ const HEX_COLOR = /^#([0-9a-f]{6})$/i;
 export function badgeColors(departure: Departure): { background: string; text: string } {
     const match = HEX_COLOR.exec(departure.color ?? "");
     if (!match) {
-        return { background: modeOf(departure).color, text: "#ffffff" };
+        return { background: MODE_COLORS[departure.mode] ?? MODE_COLORS.other, text: "#ffffff" };
     }
     return { background: `#${match[1]}`, text: isLight(match[1]) ? "#1f1f1f" : "#ffffff" };
 }

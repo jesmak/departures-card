@@ -171,25 +171,48 @@
         {
             "name": "one-stop",
             "width": 500,
-            "card": { "type": "custom:departures-card", "entities": ["sensor.keskustori_tke0001"] }
+            "card": {
+                "type": "custom:departures-card",
+                "entities": ["sensor.keskustori_tke0001"]
+            }
         },
         {
             "name": "station",
             "width": 500,
-            "card": { "type": "custom:departures-card", "entities": ["sensor.tampere_station"] }
+            "card": {
+                "type": "custom:departures-card",
+                "entities": ["sensor.tampere_station"]
+            }
         },
         {
             "name": "two-stops",
             "width": 800,
             "card": {
                 "type": "custom:departures-card",
-                "entities": [{ "entity": "sensor.keskustori_tke0001", "subtitle": "towards Hervanta" }, "sensor.tampere_station"]
+                "entities": [
+                    {
+                        "entity": "sensor.keskustori_tke0001",
+                        "subtitle": "towards Hervanta"
+                    },
+                    "sensor.tampere_station"
+                ]
             }
         },
         {
             "name": "stop-with-notices",
             "width": 500,
-            "card": { "type": "custom:departures-card", "entities": ["sensor.hameenkatu_tke0002"] }
+            "card": {
+                "type": "custom:departures-card",
+                "entities": ["sensor.hameenkatu_tke0002"]
+            }
+        },
+        {
+            "name": "narrow",
+            "width": 240,
+            "card": {
+                "type": "custom:departures-card",
+                "entities": ["sensor.hameenkatu_tke0002"]
+            }
         }
     ]
 }

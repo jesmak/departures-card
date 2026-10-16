@@ -68,10 +68,12 @@ export class DeparturesCard extends LitElement {
     }
 
     public setConfig(config: DeparturesCardConfig): void {
-        if (!config || sectionsOf(config.entities).length === 0) {
+        // One sensor may be written without a list around it.
+        const entities: unknown = typeof config?.entities === "string" ? [config.entities] : config?.entities;
+        if (!config || !Array.isArray(entities) || sectionsOf(entities).length === 0) {
             throw new Error(translate(browserLanguage(), "common.invalid_configuration"));
         }
-        this.config = { ...config };
+        this.config = { ...config, entities };
     }
 
     public getCardSize(): number {
@@ -79,9 +81,16 @@ export class DeparturesCard extends LitElement {
         return 1 + sections * (2 + (this.config?.departures ?? DEFAULT_DEPARTURES));
     }
 
+    /** In a sections view the card takes a whole section by default and is never narrower than half of one. */
+    public getGridOptions(): Record<string, unknown> {
+        return { columns: 12, min_columns: 6, rows: "auto" };
+    }
+
     /** The countdowns run on between the sensor's updates, so the card redraws itself while it is on the page. */
     public connectedCallback(): void {
         super.connectedCallback();
+        // Back on the page, such as from another view, its countdowns are as old as when it left.
+        this.requestUpdate();
         this.ticker = setInterval(() => this.requestUpdate(), TICK_MS);
     }
 
@@ -108,7 +117,7 @@ export class DeparturesCard extends LitElement {
             ...new Set(sections.map(({ entity }) => this.hass?.states[entity]?.attributes?.attribution).filter((text) => !!text)),
         ];
         return html`
-            <ha-card>
+            <ha-card class=${this.config.full_texts ? "full" : ""}>
                 ${this.config.title ? html`<h1 class="card-title">${this.config.title}</h1>` : nothing}
                 <div class="sections">${sections.map((section) => this.section(section))}</div>
                 ${attributions.length ? html`<div class="attribution">${attributions.join(" · ")}</div>` : nothing}
@@ -128,7 +137,7 @@ export class DeparturesCard extends LitElement {
         if (!entity) {
             return html`<section>
                 ${heading}
-                <div class="message">${this.text("common.no_entity")} ${section.entity}</div>
+                <div class="message">${this.text("common.no_entity", { entity: section.entity })}</div>
             </section>`;
         }
         if (entity.state === "unavailable") {
@@ -140,7 +149,7 @@ export class DeparturesCard extends LitElement {
         if (!isDeparturesSensor(entity)) {
             return html`<section>
                 ${heading}
-                <div class="message">${section.entity} ${this.text("common.not_departures")}</div>
+                <div class="message">${this.text("common.not_departures", { entity: section.entity })}</div>
             </section>`;
         }
 
@@ -277,8 +286,9 @@ export class DeparturesCard extends LitElement {
         this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true }));
     }
 
-    private text(key: string): string {
-        return translate(this.language(), key);
+    /** A text in the viewer's language, with `{name}` in it replaced, so a translation can put the value where it reads right. */
+    private text(key: string, values: Record<string, string> = {}): string {
+        return translate(this.language(), key).replace(/\{(\w+)\}/g, (match, name: string) => values[name] ?? match);
     }
 
     private language(): string {
@@ -339,8 +349,9 @@ export class DeparturesCard extends LitElement {
 
             .heading {
                 display: flex;
+                flex-wrap: wrap;
                 align-items: baseline;
-                gap: 8px;
+                gap: 0 8px;
                 min-width: 0;
                 max-width: 100%;
                 padding: 0;
@@ -355,9 +366,7 @@ export class DeparturesCard extends LitElement {
             .name {
                 font-size: 14px;
                 font-weight: var(--ha-font-weight-medium, 500);
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                overflow-wrap: anywhere;
             }
 
             .subtitle,
@@ -368,11 +377,18 @@ export class DeparturesCard extends LitElement {
                 color: var(--secondary-text-color);
             }
 
+            /* A secondary text, cut short unless full_texts asks for it whole. */
             .subtitle {
+                min-width: 0;
                 font-size: 14px;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
+            }
+
+            .full .subtitle {
+                white-space: normal;
+                overflow-wrap: anywhere;
             }
 
             .message {
@@ -398,9 +414,24 @@ export class DeparturesCard extends LitElement {
             }
 
             .headsign {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                overflow-wrap: anywhere;
+            }
+
+            /* On a narrow card the large departure's destination takes a line of its own, under the badge and countdown. */
+            @container (max-width: 399px) {
+                .next {
+                    flex-wrap: wrap;
+                    row-gap: 6px;
+                }
+
+                .next-text {
+                    order: 3;
+                    flex-basis: 100%;
+                }
+
+                .countdown {
+                    margin-left: auto;
+                }
             }
 
             .meta {
@@ -424,12 +455,14 @@ export class DeparturesCard extends LitElement {
                 font-weight: var(--ha-font-weight-medium, 500);
             }
 
+            /* A line known by a long name rather than a number wraps inside its badge. */
             .badge {
                 flex: none;
                 box-sizing: border-box;
+                max-width: 40cqw;
                 text-align: center;
                 font-weight: var(--ha-font-weight-bold, 700);
-                white-space: nowrap;
+                overflow-wrap: anywhere;
             }
 
             .badge.large {
@@ -452,10 +485,12 @@ export class DeparturesCard extends LitElement {
                 border-top: 1px solid var(--divider-color);
             }
 
+            /* A row stays on one line while its destination has room, and moves what doesn't fit to the next. */
             .row {
                 display: flex;
+                flex-wrap: wrap;
                 align-items: center;
-                gap: 10px;
+                gap: 2px 10px;
                 padding: 5px 0;
                 font-size: 14px;
             }
@@ -478,21 +513,29 @@ export class DeparturesCard extends LitElement {
                 min-width: 72px;
             }
 
+            /* Below 100 px the destination takes the next line, or a short one such as Pasila would sit squeezed between them. */
             .row .headsign {
-                flex: 1;
+                flex: 1 1 100px;
                 min-width: 0;
             }
 
             .info {
-                flex: none;
+                flex: 0 1 auto;
+                min-width: 0;
+                margin-left: auto;
                 display: flex;
+                flex-wrap: wrap;
+                justify-content: flex-end;
                 align-items: center;
-                gap: 6px;
+                gap: 2px 6px;
                 font-size: 12px;
-                max-width: 45%;
+            }
+
+            /* Numbers stay whole: a track cut short is another track. */
+            .platform,
+            .late,
+            .early {
                 white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
             }
 
             .row.cancelled .headsign,
@@ -555,10 +598,17 @@ export class DeparturesCard extends LitElement {
                 color: var(--warning-color, #b45309);
             }
 
+            /* A row's notice is a secondary text, cut short unless full_texts asks for it whole. */
             .info .alert {
                 min-width: 0;
+                white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
+            }
+
+            .full .info .alert {
+                white-space: normal;
+                overflow-wrap: anywhere;
             }
 
             .attribution {

@@ -2,9 +2,9 @@
     "common": {
         "name": "Departures",
         "description": "The next departures from bus stops and railway stations",
-        "invalid_configuration": "Invalid configuration. Add at least one departures sensor",
-        "no_entity": "Entity not found:",
-        "not_departures": "is not a departures sensor",
+        "invalid_configuration": "Invalid configuration. Add at least one departures sensor.",
+        "no_entity": "Entity {entity} not found",
+        "not_departures": "{entity} is not a departures sensor",
         "unavailable": "Departures are not available right now",
         "no_departures": "No upcoming departures",
         "now": "Now",
@@ -12,8 +12,7 @@
         "cancelled": "Cancelled",
         "track": "Track",
         "platform": "Platform",
-        "realtime": "Real-time estimate",
-        "scheduled": "Scheduled"
+        "realtime": "Real-time estimate"
     },
     "editor": {
         "title": "Title",
@@ -28,6 +27,8 @@
         "departures_helper": "The next one large and the rest below it",
         "show_cancelled": "Show cancelled departures",
         "show_notices": "Show notices",
-        "show_notices_helper": "Track works and other notices for the whole stop, under its name"
+        "show_notices_helper": "Track works and other notices for the whole stop, under its name",
+        "full_texts": "Show texts in full",
+        "full_texts_helper": "The subtitle and the notices of later departures wrap instead of being cut short"
     }
 }

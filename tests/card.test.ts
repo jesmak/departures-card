@@ -114,7 +114,7 @@ describe("departures-card", () => {
             "sensor.missing",
         ]);
         expect(text(sections[1].querySelector(".message"))).toBe("Lähtötiedot eivät ole juuri nyt saatavilla");
-        expect(text(sections[2].querySelector(".message"))).toBe("Entiteettiä ei ole: sensor.missing");
+        expect(text(sections[2].querySelector(".message"))).toBe("Entiteettiä sensor.missing ei löydy");
     });
 
     it("shows the stop's notices in full under its name, unless they are hidden", async () => {
@@ -129,6 +129,34 @@ describe("departures-card", () => {
     it("refuses a configuration with no stops", () => {
         const element = document.createElement("departures-card");
         expect(() => element.setConfig({ type: "custom:departures-card", entities: [] })).toThrow();
+        // Not a list nor a sensor: the card's own message, not a TypeError.
+        const broken = { type: "custom:departures-card", entities: { entity: "sensor.kauppatori" } } as unknown as DeparturesCardConfig;
+        expect(() => element.setConfig(broken)).toThrow(/departures sensor|lähtösensori/);
+    });
+
+    it("takes one sensor written without a list", async () => {
+        const root = (await card(hass({ "sensor.kauppatori": [departure("a", 5)] }), { entities: "sensor.kauppatori" as never }))
+            .shadowRoot!;
+        expect(text(root.querySelector(".name"))).toBe("Kauppatori");
+    });
+
+    it("cuts the subtitle short unless texts are shown in full, and is never narrower than half a section", async () => {
+        const state = hass({ "sensor.kauppatori": [departure("a", 5)] });
+        const cut = await card(state, { entities: [{ entity: "sensor.kauppatori", subtitle: "keskustaan" }] });
+        expect(cut.shadowRoot!.querySelector("ha-card")?.classList.contains("full")).toBe(false);
+        const full = await card(state, { entities: [{ entity: "sensor.kauppatori", subtitle: "keskustaan" }], full_texts: true });
+        expect(full.shadowRoot!.querySelector("ha-card")?.classList.contains("full")).toBe(true);
+        expect(full.getGridOptions()).toEqual({ columns: 12, min_columns: 6, rows: "auto" });
+    });
+
+    it("brings its countdowns up to date when it comes back onto the page", async () => {
+        const element = await card(hass({ "sensor.kauppatori": [departure("a", 10)] }), {});
+        expect(text(element.shadowRoot!.querySelector(".countdown"))).toBe("10 min");
+        element.remove();
+        vi.setSystemTime(NOW + 6 * 60_000);
+        document.body.append(element);
+        await element.updateComplete;
+        expect(text(element.shadowRoot!.querySelector(".countdown"))).toBe("4 min");
     });
 });
 

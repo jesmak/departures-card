@@ -58,6 +58,7 @@ you make one, give its repository the topic too. A template entity can write the
 | `departures`     | number  | `4`      | How many departures each stop shows, the large one included                          |
 | `show_cancelled` | boolean | `true`   | Show cancelled departures, struck through with the reason                            |
 | `show_notices`   | boolean | `true`   | Show the stop's notices, such as track works, under its name                         |
+| `full_texts`     | boolean | `false`  | Wrap the subtitle and the notices of later departures instead of cutting them short  |
 
 Each item of `entities` is an entity id, or an object with these keys:
 
@@ -72,10 +73,11 @@ Everything can be set in the card's visual editor.
 ## What it shows
 
 - **How soon it leaves:** "now" under a minute, minutes under an hour, and the clock time after that. A time that
-  isn't today has its weekday in front ("Mon 06:15"), and one more than a week away its date. The countdown runs on
+  isn't today has its weekday in front ("Mon 06:15"), and one a week or more away its date. The countdown runs on
   between the sensor's updates, and a departure more than a minute gone is hidden.
-- **Live times:** a departure tracked in real time has a live icon. When it is late or early, its timetable time is
-  struck through next to the estimate, with the difference in minutes.
+- **Live times:** the large departure has a live icon when it is tracked in real time. When it is late or early, its
+  timetable time is struck through next to the estimate, with the difference in minutes. A later departure shows its
+  estimate with the difference.
 - **The line's colour**, when the integration gives one, otherwise a colour by vehicle type.
 - **Track or platform:** a train's track, or another vehicle's platform, when the stop has them.
 - **Cancellations:** a cancelled departure stays in the list, greyed and struck through, with the reason when the
@@ -83,10 +85,24 @@ Everything can be set in the card's visual editor.
 - **Notices:** a notice about the departure itself, such as "Passengers are directed to train S 106", and the stop's
   own notices, such as track works with buses replacing trains, shown in full under its name.
 
-<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-light.png#gh-light-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice in full, and the rows below with the same notice cut short on the lines it concerns">
-<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-dark.png#gh-dark-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice in full, and the rows below with the same notice cut short on the lines it concerns">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-light.png#gh-light-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice in full, and the rows below with the same notice on its own line under the departure it concerns">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-dark.png#gh-dark-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice in full, and the rows below with the same notice on its own line under the departure it concerns">
 
 Clicking a stop's name opens its sensor.
+
+## Sizes
+
+In a sections view the card takes a whole section by default and can be made as narrow as half of one. Two stops sit
+side by side once the card is wide enough for both. The stop's name and the destinations wrap rather than being cut,
+and so does a line known by a long name rather than a number, inside its badge. Times, tracks and platforms are never
+cut. A later departure stays on one line while its destination has room, and moves its delay, notice and platform to
+the next line when it hasn't. On a narrow card the large departure's destination goes under its badge and countdown.
+
+The subtitle and the notices of later departures are cut short to keep the card compact. Set `full_texts: true` to
+show them in full.
+
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/narrow-light.png#gh-light-mode-only" width="250" alt="A bus stop on a card half a section wide, the destination under the line and countdown, and the delays and platforms of later departures on lines of their own">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/narrow-dark.png#gh-dark-mode-only" width="250" alt="A bus stop on a card half a section wide, the destination under the line and countdown, and the delays and platforms of later departures on lines of their own">
 
 ## Colours
 

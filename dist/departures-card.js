@@ -1,4 +1,4 @@
-/*! departures-card 1.0.1 | MIT License */
+/*! departures-card 1.1.0 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,18 +711,18 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.0.1";
+var CARD_VERSION = "1.1.0";
 var DEPARTURES_VERSION = 1;
 var DEFAULT_DEPARTURES = 4;
 var GONE_AFTER_MS = 6e4;
 var TICK_MS = 15e3;
-var MODES = {
-  bus: { icon: "mdi:bus", color: "var(--departures-bus-color, #0b6aa2)" },
-  tram: { icon: "mdi:tram", color: "var(--departures-tram-color, #00845a)" },
-  metro: { icon: "mdi:subway-variant", color: "var(--departures-metro-color, #d9480f)" },
-  train: { icon: "mdi:train", color: "var(--departures-train-color, #1b7a3e)" },
-  ferry: { icon: "mdi:ferry", color: "var(--departures-ferry-color, #00639a)" },
-  other: { icon: "mdi:map-marker-path", color: "var(--departures-other-color, #5f6b76)" }
+var MODE_COLORS = {
+  bus: "var(--departures-bus-color, #0b6aa2)",
+  tram: "var(--departures-tram-color, #00845a)",
+  metro: "var(--departures-metro-color, #d9480f)",
+  train: "var(--departures-train-color, #1b7a3e)",
+  ferry: "var(--departures-ferry-color, #00639a)",
+  other: "var(--departures-other-color, #5f6b76)"
 };
 
 // src/departures.ts
@@ -764,21 +764,18 @@ function clock(time, language, timeZone) {
 function dayLabel(time, now, language, timeZone) {
   const date = (value) => new Intl.DateTimeFormat("en-CA", { timeZone }).format(value);
   const day = date(new Date(time));
-  if (day === date(now)) {
+  const daysAway = (Date.parse(`${day}T00:00:00Z`) - Date.parse(`${date(now)}T00:00:00Z`)) / 864e5;
+  if (daysAway <= 0) {
     return "";
   }
-  const daysAway = (Date.parse(`${day}T00:00:00Z`) - Date.parse(`${date(now)}T00:00:00Z`)) / 864e5;
-  const options = daysAway > 0 && daysAway < 7 ? { weekday: "short" } : { day: "numeric", month: "numeric" };
+  const options = daysAway < 7 ? { weekday: "short" } : { day: "numeric", month: "numeric" };
   return new Intl.DateTimeFormat(language, { ...options, timeZone }).format(new Date(time));
-}
-function modeOf(departure) {
-  return MODES[departure.mode] ?? MODES.other;
 }
 var HEX_COLOR = /^#([0-9a-f]{6})$/i;
 function badgeColors(departure) {
   const match = HEX_COLOR.exec(departure.color ?? "");
   if (!match) {
-    return { background: modeOf(departure).color, text: "#ffffff" };
+    return { background: MODE_COLORS[departure.mode] ?? MODE_COLORS.other, text: "#ffffff" };
   }
   return { background: `#${match[1]}`, text: isLight(match[1]) ? "#1f1f1f" : "#ffffff" };
 }
@@ -796,9 +793,9 @@ var en_default = {
   common: {
     name: "Departures",
     description: "The next departures from bus stops and railway stations",
-    invalid_configuration: "Invalid configuration. Add at least one departures sensor",
-    no_entity: "Entity not found:",
-    not_departures: "is not a departures sensor",
+    invalid_configuration: "Invalid configuration. Add at least one departures sensor.",
+    no_entity: "Entity {entity} not found",
+    not_departures: "{entity} is not a departures sensor",
     unavailable: "Departures are not available right now",
     no_departures: "No upcoming departures",
     now: "Now",
@@ -806,8 +803,7 @@ var en_default = {
     cancelled: "Cancelled",
     track: "Track",
     platform: "Platform",
-    realtime: "Real-time estimate",
-    scheduled: "Scheduled"
+    realtime: "Real-time estimate"
   },
   editor: {
     title: "Title",
@@ -822,7 +818,9 @@ var en_default = {
     departures_helper: "The next one large and the rest below it",
     show_cancelled: "Show cancelled departures",
     show_notices: "Show notices",
-    show_notices_helper: "Track works and other notices for the whole stop, under its name"
+    show_notices_helper: "Track works and other notices for the whole stop, under its name",
+    full_texts: "Show texts in full",
+    full_texts_helper: "The subtitle and the notices of later departures wrap instead of being cut short"
   }
 };
 
@@ -832,8 +830,8 @@ var fi_default = {
     name: "L\xE4hd\xF6t",
     description: "Seuraavat l\xE4hd\xF6t pys\xE4keilt\xE4 ja rautatieasemilta",
     invalid_configuration: "Virheellinen konfiguraatio. Lis\xE4\xE4 v\xE4hint\xE4\xE4n yksi l\xE4ht\xF6sensori.",
-    no_entity: "Entiteetti\xE4 ei ole:",
-    not_departures: "ei ole l\xE4ht\xF6sensori",
+    no_entity: "Entiteetti\xE4 {entity} ei l\xF6ydy",
+    not_departures: "{entity} ei ole pys\xE4kkianturi",
     unavailable: "L\xE4ht\xF6tiedot eiv\xE4t ole juuri nyt saatavilla",
     no_departures: "Ei tulevia l\xE4ht\xF6j\xE4",
     now: "Nyt",
@@ -841,8 +839,7 @@ var fi_default = {
     cancelled: "Peruttu",
     track: "Raide",
     platform: "Laituri",
-    realtime: "Reaaliaikainen arvio",
-    scheduled: "Aikataulun mukaan"
+    realtime: "Reaaliaikainen arvio"
   },
   editor: {
     title: "Otsikko",
@@ -857,7 +854,9 @@ var fi_default = {
     departures_helper: "Seuraava isona ja loput sen alla",
     show_cancelled: "N\xE4yt\xE4 perutut l\xE4hd\xF6t",
     show_notices: "N\xE4yt\xE4 tiedotteet",
-    show_notices_helper: "Rataty\xF6t ja muut koko pys\xE4kki\xE4 koskevat tiedotteet sen nimen alla"
+    show_notices_helper: "Rataty\xF6t ja muut koko pys\xE4kki\xE4 koskevat tiedotteet sen nimen alla",
+    full_texts: "N\xE4yt\xE4 tekstit kokonaan",
+    full_texts_helper: "Alaotsikko ja my\xF6hempien l\xE4ht\xF6jen tiedotteet rivitet\xE4\xE4n lyhent\xE4misen sijaan"
   }
 };
 
@@ -889,9 +888,10 @@ function browserLanguage() {
 var DEFAULTS = {
   departures: DEFAULT_DEPARTURES,
   show_cancelled: true,
-  show_notices: true
+  show_notices: true,
+  full_texts: false
 };
-function schema(hass, text) {
+function stopsSchema(hass, text) {
   return [
     { name: "title", selector: { text: {} } },
     {
@@ -908,23 +908,26 @@ function schema(hass, text) {
               required: true,
               selector: { entity: { include_entities: departuresSensors(hass) } }
             },
-            name: { label: text("editor.name"), selector: { text: {} } },
-            subtitle: { label: text("editor.subtitle"), selector: { text: {} } }
+            name: { label: text("editor.name"), description: text("editor.name_helper"), selector: { text: {} } },
+            subtitle: { label: text("editor.subtitle"), description: text("editor.subtitle_helper"), selector: { text: {} } }
           }
         }
       }
-    },
-    {
-      type: "grid",
-      name: "",
-      schema: [
-        { name: "departures", selector: { number: { min: 1, max: 20, step: 1, mode: "box" } } },
-        { name: "show_cancelled", selector: { boolean: {} } },
-        { name: "show_notices", selector: { boolean: {} } }
-      ]
     }
   ];
 }
+var OPTIONS_SCHEMA = [
+  {
+    type: "grid",
+    name: "",
+    schema: [
+      { name: "departures", selector: { number: { min: 1, max: 20, step: 1, mode: "box" } } },
+      { name: "show_cancelled", selector: { boolean: {} } },
+      { name: "show_notices", selector: { boolean: {} } },
+      { name: "full_texts", selector: { boolean: {} } }
+    ]
+  }
+];
 function compactSections(sections) {
   return sectionsOf(sections).map((section) => {
     const entry = { entity: section.entity };
@@ -949,15 +952,35 @@ var DeparturesCardEditor = class extends i4 {
     if (!this.hass) {
       return A;
     }
+    const data = { ...DEFAULTS, ...this.config, entities: sectionsOf(this.config.entities) };
     return b2`
             <ha-form
                 .hass=${this.hass}
-                .data=${{ ...DEFAULTS, ...this.config, entities: sectionsOf(this.config.entities) }}
-                .schema=${schema(this.hass, (key) => this.text(key))}
+                .data=${data}
+                .schema=${stopsSchema(this.hass, (key) => this.text(key))}
+                .computeLabel=${(entry) => this.text(`editor.${entry.name}`)}
+                @value-changed=${this.valueChanged}
+            ></ha-form>
+            <p class="helper">${this.text("editor.entities_helper")}</p>
+            <ha-form
+                .hass=${this.hass}
+                .data=${data}
+                .schema=${OPTIONS_SCHEMA}
                 .computeLabel=${(entry) => this.text(`editor.${entry.name}`)}
                 .computeHelper=${(entry) => this.helper(entry.name)}
                 @value-changed=${this.valueChanged}
             ></ha-form>
+        `;
+  }
+  static get styles() {
+    return i`
+            .helper {
+                margin: 8px 0 16px;
+                padding: 0 16px;
+                font-size: 12px;
+                line-height: 1.4;
+                color: var(--secondary-text-color);
+            }
         `;
   }
   valueChanged(event) {
@@ -1020,18 +1043,24 @@ var DeparturesCard = class extends i4 {
     return { entities: hass ? departuresSensors(hass).slice(0, 1) : [] };
   }
   setConfig(config) {
-    if (!config || sectionsOf(config.entities).length === 0) {
+    const entities = typeof config?.entities === "string" ? [config.entities] : config?.entities;
+    if (!config || !Array.isArray(entities) || sectionsOf(entities).length === 0) {
       throw new Error(translate(browserLanguage(), "common.invalid_configuration"));
     }
-    this.config = { ...config };
+    this.config = { ...config, entities };
   }
   getCardSize() {
     const sections = this.config ? sectionsOf(this.config.entities).length : 1;
     return 1 + sections * (2 + (this.config?.departures ?? DEFAULT_DEPARTURES));
   }
+  /** In a sections view the card takes a whole section by default and is never narrower than half of one. */
+  getGridOptions() {
+    return { columns: 12, min_columns: 6, rows: "auto" };
+  }
   /** The countdowns run on between the sensor's updates, so the card redraws itself while it is on the page. */
   connectedCallback() {
     super.connectedCallback();
+    this.requestUpdate();
     this.ticker = setInterval(() => this.requestUpdate(), TICK_MS);
   }
   disconnectedCallback() {
@@ -1054,7 +1083,7 @@ var DeparturesCard = class extends i4 {
       ...new Set(sections.map(({ entity }) => this.hass?.states[entity]?.attributes?.attribution).filter((text) => !!text))
     ];
     return b2`
-            <ha-card>
+            <ha-card class=${this.config.full_texts ? "full" : ""}>
                 ${this.config.title ? b2`<h1 class="card-title">${this.config.title}</h1>` : A}
                 <div class="sections">${sections.map((section) => this.section(section))}</div>
                 ${attributions.length ? b2`<div class="attribution">${attributions.join(" \xB7 ")}</div>` : A}
@@ -1073,7 +1102,7 @@ var DeparturesCard = class extends i4 {
     if (!entity) {
       return b2`<section>
                 ${heading}
-                <div class="message">${this.text("common.no_entity")} ${section.entity}</div>
+                <div class="message">${this.text("common.no_entity", { entity: section.entity })}</div>
             </section>`;
     }
     if (entity.state === "unavailable") {
@@ -1085,7 +1114,7 @@ var DeparturesCard = class extends i4 {
     if (!isDeparturesSensor(entity)) {
       return b2`<section>
                 ${heading}
-                <div class="message">${section.entity} ${this.text("common.not_departures")}</div>
+                <div class="message">${this.text("common.not_departures", { entity: section.entity })}</div>
             </section>`;
     }
     const notices = this.config?.show_notices === false ? [] : stopNotices(entity.attributes.notices);
@@ -1193,8 +1222,9 @@ var DeparturesCard = class extends i4 {
   moreInfo(entityId) {
     this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true }));
   }
-  text(key) {
-    return translate(this.language(), key);
+  /** A text in the viewer's language, with `{name}` in it replaced, so a translation can put the value where it reads right. */
+  text(key, values = {}) {
+    return translate(this.language(), key).replace(/\{(\w+)\}/g, (match, name) => values[name] ?? match);
   }
   language() {
     return this.hass?.locale?.language ?? this.hass?.language ?? browserLanguage();
@@ -1253,8 +1283,9 @@ var DeparturesCard = class extends i4 {
 
             .heading {
                 display: flex;
+                flex-wrap: wrap;
                 align-items: baseline;
-                gap: 8px;
+                gap: 0 8px;
                 min-width: 0;
                 max-width: 100%;
                 padding: 0;
@@ -1269,9 +1300,7 @@ var DeparturesCard = class extends i4 {
             .name {
                 font-size: 14px;
                 font-weight: var(--ha-font-weight-medium, 500);
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                overflow-wrap: anywhere;
             }
 
             .subtitle,
@@ -1282,11 +1311,18 @@ var DeparturesCard = class extends i4 {
                 color: var(--secondary-text-color);
             }
 
+            /* A secondary text, cut short unless full_texts asks for it whole. */
             .subtitle {
+                min-width: 0;
                 font-size: 14px;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
+            }
+
+            .full .subtitle {
+                white-space: normal;
+                overflow-wrap: anywhere;
             }
 
             .message {
@@ -1312,9 +1348,24 @@ var DeparturesCard = class extends i4 {
             }
 
             .headsign {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                overflow-wrap: anywhere;
+            }
+
+            /* On a narrow card the large departure's destination takes a line of its own, under the badge and countdown. */
+            @container (max-width: 399px) {
+                .next {
+                    flex-wrap: wrap;
+                    row-gap: 6px;
+                }
+
+                .next-text {
+                    order: 3;
+                    flex-basis: 100%;
+                }
+
+                .countdown {
+                    margin-left: auto;
+                }
             }
 
             .meta {
@@ -1338,12 +1389,14 @@ var DeparturesCard = class extends i4 {
                 font-weight: var(--ha-font-weight-medium, 500);
             }
 
+            /* A line known by a long name rather than a number wraps inside its badge. */
             .badge {
                 flex: none;
                 box-sizing: border-box;
+                max-width: 40cqw;
                 text-align: center;
                 font-weight: var(--ha-font-weight-bold, 700);
-                white-space: nowrap;
+                overflow-wrap: anywhere;
             }
 
             .badge.large {
@@ -1366,10 +1419,12 @@ var DeparturesCard = class extends i4 {
                 border-top: 1px solid var(--divider-color);
             }
 
+            /* A row stays on one line while its destination has room, and moves what doesn't fit to the next. */
             .row {
                 display: flex;
+                flex-wrap: wrap;
                 align-items: center;
-                gap: 10px;
+                gap: 2px 10px;
                 padding: 5px 0;
                 font-size: 14px;
             }
@@ -1392,21 +1447,29 @@ var DeparturesCard = class extends i4 {
                 min-width: 72px;
             }
 
+            /* Below 100 px the destination takes the next line, or a short one such as Pasila would sit squeezed between them. */
             .row .headsign {
-                flex: 1;
+                flex: 1 1 100px;
                 min-width: 0;
             }
 
             .info {
-                flex: none;
+                flex: 0 1 auto;
+                min-width: 0;
+                margin-left: auto;
                 display: flex;
+                flex-wrap: wrap;
+                justify-content: flex-end;
                 align-items: center;
-                gap: 6px;
+                gap: 2px 6px;
                 font-size: 12px;
-                max-width: 45%;
+            }
+
+            /* Numbers stay whole: a track cut short is another track. */
+            .platform,
+            .late,
+            .early {
                 white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
             }
 
             .row.cancelled .headsign,
@@ -1469,10 +1532,17 @@ var DeparturesCard = class extends i4 {
                 color: var(--warning-color, #b45309);
             }
 
+            /* A row's notice is a secondary text, cut short unless full_texts asks for it whole. */
             .info .alert {
                 min-width: 0;
+                white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
+            }
+
+            .full .info .alert {
+                white-space: normal;
+                overflow-wrap: anywhere;
             }
 
             .attribution {

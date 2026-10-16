@@ -1,6 +1,9 @@
-/** The card's visual editor: the title, the stops with their headings, how many departures each shows, cancelled ones and notices. */
-import { LitElement, html, nothing } from "lit";
-import type { TemplateResult } from "lit";
+/**
+ * The card's visual editor: the title, the stops with their headings, how many departures each shows, cancelled ones,
+ * notices and whether texts are shown in full.
+ */
+import { LitElement, css, html, nothing } from "lit";
+import type { CSSResultGroup, TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import { DEFAULT_DEPARTURES } from "./const";
@@ -17,9 +20,11 @@ const DEFAULTS: Record<string, unknown> = {
     departures: DEFAULT_DEPARTURES,
     show_cancelled: true,
     show_notices: true,
+    full_texts: false,
 };
 
-function schema(hass: HomeAssistant, text: (key: string) => string) {
+/** The title and the stops. A field inside the object selector takes its helper from `description`, as ha-form's computeHelper doesn't reach it. */
+function stopsSchema(hass: HomeAssistant, text: (key: string) => string) {
     return [
         { name: "title", selector: { text: {} } },
         {
@@ -36,23 +41,27 @@ function schema(hass: HomeAssistant, text: (key: string) => string) {
                             required: true,
                             selector: { entity: { include_entities: departuresSensors(hass) } },
                         },
-                        name: { label: text("editor.name"), selector: { text: {} } },
-                        subtitle: { label: text("editor.subtitle"), selector: { text: {} } },
+                        name: { label: text("editor.name"), description: text("editor.name_helper"), selector: { text: {} } },
+                        subtitle: { label: text("editor.subtitle"), description: text("editor.subtitle_helper"), selector: { text: {} } },
                     },
                 },
             },
         },
-        {
-            type: "grid",
-            name: "",
-            schema: [
-                { name: "departures", selector: { number: { min: 1, max: 20, step: 1, mode: "box" } } },
-                { name: "show_cancelled", selector: { boolean: {} } },
-                { name: "show_notices", selector: { boolean: {} } },
-            ],
-        },
     ];
 }
+
+const OPTIONS_SCHEMA = [
+    {
+        type: "grid",
+        name: "",
+        schema: [
+            { name: "departures", selector: { number: { min: 1, max: 20, step: 1, mode: "box" } } },
+            { name: "show_cancelled", selector: { boolean: {} } },
+            { name: "show_notices", selector: { boolean: {} } },
+            { name: "full_texts", selector: { boolean: {} } },
+        ],
+    },
+];
 
 /** A stop with nothing but its sensor is written as the plain entity id, so the configuration stays short. */
 export function compactSections(sections: SectionConfig[]): Array<string | SectionConfig> {
@@ -82,15 +91,37 @@ export class DeparturesCardEditor extends LitElement {
             return nothing;
         }
         // The form edits every stop as an object; plain entity ids are expanded for it.
+        const data = { ...DEFAULTS, ...this.config, entities: sectionsOf(this.config.entities) };
+        // Two forms, so that the stops' helper, which Home Assistant's list of objects doesn't show, sits under the stops.
         return html`
             <ha-form
                 .hass=${this.hass}
-                .data=${{ ...DEFAULTS, ...this.config, entities: sectionsOf(this.config.entities) }}
-                .schema=${schema(this.hass, (key) => this.text(key))}
+                .data=${data}
+                .schema=${stopsSchema(this.hass, (key) => this.text(key))}
+                .computeLabel=${(entry: SchemaEntry) => this.text(`editor.${entry.name}`)}
+                @value-changed=${this.valueChanged}
+            ></ha-form>
+            <p class="helper">${this.text("editor.entities_helper")}</p>
+            <ha-form
+                .hass=${this.hass}
+                .data=${data}
+                .schema=${OPTIONS_SCHEMA}
                 .computeLabel=${(entry: SchemaEntry) => this.text(`editor.${entry.name}`)}
                 .computeHelper=${(entry: SchemaEntry) => this.helper(entry.name)}
                 @value-changed=${this.valueChanged}
             ></ha-form>
+        `;
+    }
+
+    static get styles(): CSSResultGroup {
+        return css`
+            .helper {
+                margin: 8px 0 16px;
+                padding: 0 16px;
+                font-size: 12px;
+                line-height: 1.4;
+                color: var(--secondary-text-color);
+            }
         `;
     }
 
