@@ -2,7 +2,7 @@
     "common": {
         "name": "Lähdöt",
         "description": "Seuraavat lähdöt pysäkeiltä ja rautatieasemilta",
-        "invalid_configuration": "Virheellinen konfiguraatio. Lisää vähintään yksi lähtösensori.",
+        "invalid_configuration": "Virheellinen konfiguraatio. Lisää vähintään yksi pysäkkianturi.",
         "no_entity": "Entiteettiä {entity} ei löydy",
         "not_departures": "{entity} ei ole pysäkkianturi",
         "unavailable": "Lähtötiedot eivät ole juuri nyt saatavilla",
@@ -17,11 +17,11 @@
     "editor": {
         "title": "Otsikko",
         "entities": "Pysäkit",
-        "entities_helper": "Lähtösensorit, kukin omana osionaan. Kadun molemmat puolet mahtuvat samaan korttiin.",
-        "entity": "Lähtösensori",
+        "entities_helper": "Pysäkkianturit, kukin omana osionaan. Kadun molemmat puolet mahtuvat samaan korttiin.",
+        "entity": "Pysäkkianturi",
         "name": "Nimi",
         "name_helper": "Korvaa pysäkin oman nimen",
-        "subtitle": "Lisäotsikko",
+        "subtitle": "Alaotsikko",
         "subtitle_helper": "Esimerkiksi suunta, keskustaan päin",
         "departures": "Lähtöjä pysäkiltä",
         "departures_helper": "Seuraava isona ja loput sen alla",

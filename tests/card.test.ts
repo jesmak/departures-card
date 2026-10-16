@@ -131,7 +131,7 @@ describe("departures-card", () => {
         expect(() => element.setConfig({ type: "custom:departures-card", entities: [] })).toThrow();
         // Not a list nor a sensor: the card's own message, not a TypeError.
         const broken = { type: "custom:departures-card", entities: { entity: "sensor.kauppatori" } } as unknown as DeparturesCardConfig;
-        expect(() => element.setConfig(broken)).toThrow(/departures sensor|lähtösensori/);
+        expect(() => element.setConfig(broken)).toThrow(/departures sensor|pysäkkianturi/);
     });
 
     it("takes one sensor written without a list", async () => {

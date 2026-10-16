@@ -829,7 +829,7 @@ var fi_default = {
   common: {
     name: "L\xE4hd\xF6t",
     description: "Seuraavat l\xE4hd\xF6t pys\xE4keilt\xE4 ja rautatieasemilta",
-    invalid_configuration: "Virheellinen konfiguraatio. Lis\xE4\xE4 v\xE4hint\xE4\xE4n yksi l\xE4ht\xF6sensori.",
+    invalid_configuration: "Virheellinen konfiguraatio. Lis\xE4\xE4 v\xE4hint\xE4\xE4n yksi pys\xE4kkianturi.",
     no_entity: "Entiteetti\xE4 {entity} ei l\xF6ydy",
     not_departures: "{entity} ei ole pys\xE4kkianturi",
     unavailable: "L\xE4ht\xF6tiedot eiv\xE4t ole juuri nyt saatavilla",
@@ -844,11 +844,11 @@ var fi_default = {
   editor: {
     title: "Otsikko",
     entities: "Pys\xE4kit",
-    entities_helper: "L\xE4ht\xF6sensorit, kukin omana osionaan. Kadun molemmat puolet mahtuvat samaan korttiin.",
-    entity: "L\xE4ht\xF6sensori",
+    entities_helper: "Pys\xE4kkianturit, kukin omana osionaan. Kadun molemmat puolet mahtuvat samaan korttiin.",
+    entity: "Pys\xE4kkianturi",
     name: "Nimi",
     name_helper: "Korvaa pys\xE4kin oman nimen",
-    subtitle: "Lis\xE4otsikko",
+    subtitle: "Alaotsikko",
     subtitle_helper: "Esimerkiksi suunta, keskustaan p\xE4in",
     departures: "L\xE4ht\xF6j\xE4 pys\xE4kilt\xE4",
     departures_helper: "Seuraava isona ja loput sen alla",
