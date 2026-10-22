@@ -111,6 +111,7 @@ describe("badgeColors", () => {
 
     it("fall back to the mode's colour, and to other's for a mode nobody knows", () => {
         expect(badgeColors(departure("a", 1, { mode: "train" })).background).toContain("--departures-train-color");
+        expect(badgeColors(departure("a", 1, { mode: "plane" })).background).toContain("--departures-plane-color");
         expect(badgeColors(departure("a", 1, { mode: "funicular", color: "red" })).background).toContain("--departures-other-color");
     });
 });

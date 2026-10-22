@@ -1,7 +1,7 @@
 {
     "common": {
         "name": "Departures",
-        "description": "The next departures from bus stops and railway stations",
+        "description": "The next departures from stops, railway stations and airports",
         "invalid_configuration": "Invalid configuration. Add at least one departures sensor.",
         "no_entity": "Entity {entity} not found",
         "not_departures": "{entity} is not a departures sensor",
@@ -12,6 +12,7 @@
         "cancelled": "Cancelled",
         "track": "Track",
         "platform": "Platform",
+        "gate": "Gate",
         "realtime": "Real-time estimate"
     },
     "editor": {

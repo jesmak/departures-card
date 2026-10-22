@@ -1,7 +1,7 @@
 # Departures card
 
-Home Assistant dashboard card for the next departures from bus stops and railway stations, from any sensor in the
-departures format.
+Home Assistant dashboard card for the next departures from stops, railway stations and airports, from any sensor in
+the departures format.
 
 [![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![HACS][hacs-shield]][hacs] [![License][license-shield]](LICENSE)
 
@@ -14,9 +14,9 @@ departures format.
 
 ## What is it?
 
-A custom card that shows when the next bus, tram or train leaves. Each stop is a section of its own, with the next
-departure large, its line, destination and a countdown, and the ones after it as rows below. Several stops fit in one
-card, such as both sides of a street, and they sit side by side when the card is wide enough.
+A custom card that shows when the next bus, tram, train or flight leaves. Each stop is a section of its own, with the
+next departure large, its line, destination and a countdown, and the ones after it as rows below. Several stops fit in
+one card, such as both sides of a street, and they sit side by side when the card is wide enough.
 
 <img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/two-stops-light.png#gh-light-mode-only" width="810" alt="A bus stop and a railway station side by side in one card, each with its next departure large and the following ones below">
 <img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/two-stops-dark.png#gh-dark-mode-only" width="810" alt="A bus stop and a railway station side by side in one card, each with its next departure large and the following ones below">
@@ -79,7 +79,7 @@ Everything can be set in the card's visual editor.
   timetable time is struck through next to the estimate, with the difference in minutes. A later departure shows its
   estimate with the difference.
 - **The line's colour**, when the integration gives one, otherwise a colour by vehicle type.
-- **Track or platform:** a train's track, or another vehicle's platform, when the stop has them.
+- **Track, platform or gate:** a train's track, a plane's gate, or another vehicle's platform, when the stop has them.
 - **Cancellations:** a cancelled departure stays in the list, greyed and struck through, with the reason when the
   integration gives one. It is never the large one, which is always the next departure you can actually take.
 - **Notices:** a notice about the departure itself, such as "Passengers are directed to train S 106", and the stop's
@@ -94,9 +94,10 @@ Clicking a stop's name opens its sensor.
 
 In a sections view the card takes a whole section by default and can be made as narrow as half of one. Two stops sit
 side by side once the card is wide enough for both. The stop's name and the destinations wrap rather than being cut,
-and so does a line known by a long name rather than a number, inside its badge. Times, tracks and platforms are never
-cut. A later departure stays on one line while its destination has room, and moves its delay, notice and platform to
-the next line when it hasn't. On a narrow card the large departure's destination goes under its badge and countdown.
+and so does a line known by a long name rather than a number, inside its badge. Times, tracks, platforms and gates
+are never cut. A later departure stays on one line while its destination has room, and moves its delay, notice and
+platform to the next line when it hasn't. On a narrow card the large departure's destination goes under its badge and
+countdown.
 
 The subtitle and the notices of later departures are cut short to keep the card compact. Set `full_texts: true` to
 show them in full.
@@ -115,6 +116,7 @@ The vehicle types' colours can be changed in a theme:
 | `--departures-metro-color` | `#d9480f` |
 | `--departures-train-color` | `#1b7a3e` |
 | `--departures-ferry-color` | `#00639a` |
+| `--departures-plane-color` | `#6741d9` |
 | `--departures-other-color` | `#5f6b76` |
 
 ## Examples

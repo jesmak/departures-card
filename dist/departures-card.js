@@ -1,4 +1,4 @@
-/*! departures-card 1.1.0 | MIT License */
+/*! departures-card 1.2.0 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,7 +711,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.1.0";
+var CARD_VERSION = "1.2.0";
 var DEPARTURES_VERSION = 1;
 var DEFAULT_DEPARTURES = 4;
 var GONE_AFTER_MS = 6e4;
@@ -722,6 +722,7 @@ var MODE_COLORS = {
   metro: "var(--departures-metro-color, #d9480f)",
   train: "var(--departures-train-color, #1b7a3e)",
   ferry: "var(--departures-ferry-color, #00639a)",
+  plane: "var(--departures-plane-color, #6741d9)",
   other: "var(--departures-other-color, #5f6b76)"
 };
 
@@ -792,7 +793,7 @@ function isLight(hex) {
 var en_default = {
   common: {
     name: "Departures",
-    description: "The next departures from bus stops and railway stations",
+    description: "The next departures from stops, railway stations and airports",
     invalid_configuration: "Invalid configuration. Add at least one departures sensor.",
     no_entity: "Entity {entity} not found",
     not_departures: "{entity} is not a departures sensor",
@@ -803,6 +804,7 @@ var en_default = {
     cancelled: "Cancelled",
     track: "Track",
     platform: "Platform",
+    gate: "Gate",
     realtime: "Real-time estimate"
   },
   editor: {
@@ -828,7 +830,7 @@ var en_default = {
 var fi_default = {
   common: {
     name: "L\xE4hd\xF6t",
-    description: "Seuraavat l\xE4hd\xF6t pys\xE4keilt\xE4 ja rautatieasemilta",
+    description: "Seuraavat l\xE4hd\xF6t pys\xE4keilt\xE4, rautatieasemilta ja lentoasemilta",
     invalid_configuration: "Virheellinen konfiguraatio. Lis\xE4\xE4 v\xE4hint\xE4\xE4n yksi pys\xE4kkianturi.",
     no_entity: "Entiteetti\xE4 {entity} ei l\xF6ydy",
     not_departures: "{entity} ei ole pys\xE4kkianturi",
@@ -839,6 +841,7 @@ var fi_default = {
     cancelled: "Peruttu",
     track: "Raide",
     platform: "Laituri",
+    gate: "Portti",
     realtime: "Reaaliaikainen arvio"
   },
   editor: {
@@ -1035,6 +1038,10 @@ registry.customCards.push({
   preview: true
 });
 var DeparturesCard = class extends i4 {
+  constructor() {
+    super(...arguments);
+    this.resizes = new ResizeObserver(() => this.alignBadgesSoon());
+  }
   static getConfigElement() {
     return document.createElement("departures-card-editor");
   }
@@ -1066,6 +1073,39 @@ var DeparturesCard = class extends i4 {
   disconnectedCallback() {
     super.disconnectedCallback();
     clearInterval(this.ticker);
+    this.resizes.disconnect();
+    cancelAnimationFrame(this.frame ?? 0);
+  }
+  updated() {
+    if (!this.isConnected) {
+      return;
+    }
+    const card = this.renderRoot.querySelector("ha-card");
+    if (card) {
+      this.resizes.observe(card);
+    }
+    this.alignBadgesSoon();
+  }
+  /**
+   * A stop's later departures get badges as wide as its widest, so their destinations line up, as line names such as
+   * AY957 and SK1709 differ in width. Measured after every render and every change in the card's size, on the next
+   * frame and once however often it is asked. ha-card draws the slot the content sits in only after this card's
+   * update, and until then nothing in it has a size. Measured afresh each time, so the badges can also get narrower.
+   * A hidden card measures nothing and drops its widths, and measures again when it is shown, as its size changes.
+   */
+  alignBadgesSoon() {
+    cancelAnimationFrame(this.frame ?? 0);
+    this.frame = requestAnimationFrame(() => this.alignBadges());
+  }
+  alignBadges() {
+    for (const rows of this.renderRoot.querySelectorAll(".rows")) {
+      rows.style.removeProperty("--badge-width");
+      const widths = [...rows.querySelectorAll(".badge")].map((badge) => parseFloat(getComputedStyle(badge).width) || 0);
+      const widest = Math.ceil(Math.max(0, ...widths));
+      if (widest > 0) {
+        rows.style.setProperty("--badge-width", `${widest}px`);
+      }
+    }
   }
   shouldUpdate(changed) {
     const previous = changed.get("hass");
@@ -1187,7 +1227,9 @@ var DeparturesCard = class extends i4 {
   }
   badge(departure, size) {
     const colors = departure.cancelled ? { background: "var(--disabled-text-color, #9e9e9e)", text: "#ffffff" } : badgeColors(departure);
-    return b2`<span class="badge ${size}" style="background:${colors.background};color:${colors.text}">${departure.line}</span>`;
+    return b2`<span class="badge ${size}" style="background:${colors.background};color:${colors.text}"
+            ><span class="line">${departure.line}</span></span
+        >`;
   }
   live(departure) {
     return departure.realtime ? b2`<ha-icon class="live" icon="mdi:access-point" title="${this.text("common.realtime")}"></ha-icon>` : A;
@@ -1200,12 +1242,14 @@ var DeparturesCard = class extends i4 {
             >${minutes > 0 ? "+" : "\u2212"}${Math.abs(minutes)} ${this.text("common.min")}</span
         >`;
   }
-  /** A train leaves from a track, everything else from a platform. */
+  /** A train leaves from a track, a plane from a gate, everything else from a platform. */
   platform(departure) {
     if (!departure.platform) {
       return A;
     }
-    const label = this.text(departure.mode === "train" ? "common.track" : "common.platform");
+    const label = this.text(
+      departure.mode === "train" ? "common.track" : departure.mode === "plane" ? "common.gate" : "common.platform"
+    );
     return b2`<span class="platform">${label} ${departure.platform}</span>`;
   }
   /** A clock time, with its day in front when it isn't today: "ma 06.15". */
@@ -1389,28 +1433,37 @@ var DeparturesCard = class extends i4 {
                 font-weight: var(--ha-font-weight-medium, 500);
             }
 
-            /* A line known by a long name rather than a number wraps inside its badge. */
+            /* A line known by a long name rather than a number wraps inside its badge at its spaces. A word never splits:
+               the badge is at least as wide as its longest word, as a flight number cut in two reads as another flight. */
             .badge {
                 flex: none;
                 box-sizing: border-box;
+                min-width: min-content;
                 max-width: 40cqw;
                 text-align: center;
                 font-weight: var(--ha-font-weight-bold, 700);
-                overflow-wrap: anywhere;
+                overflow-wrap: break-word;
+            }
+
+            .badge .line {
+                display: inline-block;
+                min-width: 24px;
             }
 
             .badge.large {
-                min-width: 44px;
                 padding: 6px 10px;
                 border-radius: 10px;
                 font-size: 18px;
             }
 
             .badge.small {
-                min-width: 36px;
                 padding: 1px 6px;
                 border-radius: 8px;
                 font-size: 13px;
+            }
+
+            .rows .badge.small {
+                min-width: var(--badge-width, min-content);
             }
 
             .rows {

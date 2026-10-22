@@ -1,5 +1,5 @@
 /**
- * A dashboard card for the next departures from bus stops and railway stations, from any sensor that
+ * A dashboard card for the next departures from stops, railway stations and airports, from any sensor that
  * writes the departures format (docs/departures-format.md).
  *
  * Each sensor is a section: its next departure large, with a countdown, and the ones after it as rows.
@@ -57,6 +57,8 @@ export class DeparturesCard extends LitElement {
     @property({ attribute: false }) public hass?: HomeAssistant;
     @state() private config?: DeparturesCardConfig;
     private ticker?: ReturnType<typeof setInterval>;
+    private readonly resizes = new ResizeObserver(() => this.alignBadgesSoon());
+    private frame?: number;
 
     public static getConfigElement(): HTMLElement {
         return document.createElement("departures-card-editor");
@@ -97,6 +99,45 @@ export class DeparturesCard extends LitElement {
     public disconnectedCallback(): void {
         super.disconnectedCallback();
         clearInterval(this.ticker);
+        this.resizes.disconnect();
+        cancelAnimationFrame(this.frame ?? 0);
+    }
+
+    protected updated(): void {
+        // An update already queued still runs after the card has left the page, and must not start watching again.
+        if (!this.isConnected) {
+            return;
+        }
+        const card = this.renderRoot.querySelector("ha-card");
+        if (card) {
+            this.resizes.observe(card);
+        }
+        this.alignBadgesSoon();
+    }
+
+    /**
+     * A stop's later departures get badges as wide as its widest, so their destinations line up, as line names such as
+     * AY957 and SK1709 differ in width. Measured after every render and every change in the card's size, on the next
+     * frame and once however often it is asked. ha-card draws the slot the content sits in only after this card's
+     * update, and until then nothing in it has a size. Measured afresh each time, so the badges can also get narrower.
+     * A hidden card measures nothing and drops its widths, and measures again when it is shown, as its size changes.
+     */
+    private alignBadgesSoon(): void {
+        cancelAnimationFrame(this.frame ?? 0);
+        this.frame = requestAnimationFrame(() => this.alignBadges());
+    }
+
+    private alignBadges(): void {
+        for (const rows of this.renderRoot.querySelectorAll<HTMLElement>(".rows")) {
+            rows.style.removeProperty("--badge-width");
+            // The layout width, not the drawn one, which a dialog opening with a scale animation would shrink. With its
+            // fractions and rounded up, so every badge gets exactly the widest one's width.
+            const widths = [...rows.querySelectorAll<HTMLElement>(".badge")].map((badge) => parseFloat(getComputedStyle(badge).width) || 0);
+            const widest = Math.ceil(Math.max(0, ...widths));
+            if (widest > 0) {
+                rows.style.setProperty("--badge-width", `${widest}px`);
+            }
+        }
     }
 
     protected shouldUpdate(changed: PropertyValues): boolean {
@@ -241,7 +282,9 @@ export class DeparturesCard extends LitElement {
         const colors = departure.cancelled
             ? { background: "var(--disabled-text-color, #9e9e9e)", text: "#ffffff" }
             : badgeColors(departure);
-        return html`<span class="badge ${size}" style="background:${colors.background};color:${colors.text}">${departure.line}</span>`;
+        return html`<span class="badge ${size}" style="background:${colors.background};color:${colors.text}"
+            ><span class="line">${departure.line}</span></span
+        >`;
     }
 
     private live(departure: Departure): TemplateResult | typeof nothing {
@@ -259,12 +302,14 @@ export class DeparturesCard extends LitElement {
         >`;
     }
 
-    /** A train leaves from a track, everything else from a platform. */
+    /** A train leaves from a track, a plane from a gate, everything else from a platform. */
     private platform(departure: Departure): TemplateResult | typeof nothing {
         if (!departure.platform) {
             return nothing;
         }
-        const label = this.text(departure.mode === "train" ? "common.track" : "common.platform");
+        const label = this.text(
+            departure.mode === "train" ? "common.track" : departure.mode === "plane" ? "common.gate" : "common.platform",
+        );
         return html`<span class="platform">${label} ${departure.platform}</span>`;
     }
 
@@ -455,28 +500,37 @@ export class DeparturesCard extends LitElement {
                 font-weight: var(--ha-font-weight-medium, 500);
             }
 
-            /* A line known by a long name rather than a number wraps inside its badge. */
+            /* A line known by a long name rather than a number wraps inside its badge at its spaces. A word never splits:
+               the badge is at least as wide as its longest word, as a flight number cut in two reads as another flight. */
             .badge {
                 flex: none;
                 box-sizing: border-box;
+                min-width: min-content;
                 max-width: 40cqw;
                 text-align: center;
                 font-weight: var(--ha-font-weight-bold, 700);
-                overflow-wrap: anywhere;
+                overflow-wrap: break-word;
+            }
+
+            .badge .line {
+                display: inline-block;
+                min-width: 24px;
             }
 
             .badge.large {
-                min-width: 44px;
                 padding: 6px 10px;
                 border-radius: 10px;
                 font-size: 18px;
             }
 
             .badge.small {
-                min-width: 36px;
                 padding: 1px 6px;
                 border-radius: 8px;
                 font-size: 13px;
+            }
+
+            .rows .badge.small {
+                min-width: var(--badge-width, min-content);
             }
 
             .rows {

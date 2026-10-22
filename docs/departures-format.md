@@ -1,8 +1,9 @@
 # Departures format, version 1
 
-A departures sensor is a Home Assistant entity that lists the next departures from one stop or station: buses
-from a bus stop, trains from a railway station, trams, ferries. The [departures card](../README.md) shows any
-entity in this format. Anything can produce one: an integration, or a template entity.
+A departures sensor is a Home Assistant entity that lists the next departures from one stop or station, such as
+buses from a bus stop, trains from a railway station, trams, ferries, or flights from an airport. The
+[departures card](../README.md) shows any entity in this format. Anything can produce one, an integration or a
+template entity.
 
 The keywords **MUST**, **SHOULD** and **MAY** are used as described in
 [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).
@@ -65,13 +66,13 @@ that changes on its own, such as "in 4 min".
 | ----------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`        | string   | **MUST** | Unique within the entity and stable between updates. Prefix it with the kind of identifier: `trip:HSL:1055_20261004_Ma_2_1645/2026-10-04`, `train:2026-10-04/45`.                                          |
 | `line`      | string   | **MUST** | What the line or train is called, short enough for a badge: `55`, `IC 45`, `M2`.                                                                                                                           |
-| `mode`      | string   | **MUST** | `bus`, `tram`, `metro`, `train`, `ferry` or `other`. Picks the default colour. An unknown mode is shown as `other`.                                                                                        |
+| `mode`      | string   | **MUST** | `bus`, `tram`, `metro`, `train`, `ferry`, `plane` or `other`. Picks the default colour. An unknown mode is shown as `other`.                                                                               |
 | `headsign`  | string   | SHOULD   | Where it's heading, as shown on the vehicle: `Koskela`, `Helsinki`.                                                                                                                                        |
 | `scheduled` | ISO 8601 | **MUST** | The timetabled departure time.                                                                                                                                                                             |
 | `estimated` | ISO 8601 | **MUST** | The live estimate when there is one, otherwise the same as `scheduled`. The card counts down to this.                                                                                                      |
 | `realtime`  | boolean  | SHOULD   | Whether `estimated` comes from live data. Missing means `false`. The card marks live times.                                                                                                                |
 | `delay`     | integer  | MAY      | Seconds behind the timetable; negative means early. Missing means 0. The card shows the delay in the minutes its clock times show, worked out from `scheduled` and `estimated`, so the two never disagree. |
-| `platform`  | string   | MAY      | Track or platform: `3`, `B`.                                                                                                                                                                               |
+| `platform`  | string   | MAY      | Track, platform or gate, such as `3`, `B` or `28`.                                                                                                                                                         |
 | `cancelled` | boolean  | MAY      | The departure is cancelled. Missing means `false`.                                                                                                                                                         |
 | `notice`    | string   | MAY      | A short notice in the language the source was configured for, such as the reason for a cancellation: `Rolling stock`.                                                                                      |
 | `color`     | string   | MAY      | The line's own colour as a CSS hex colour, `#00985f`. Replaces the mode's default colour. The card picks a readable text colour for it.                                                                    |
@@ -99,6 +100,8 @@ its name, and a departure's `notice` in full on the next departure and cut short
 - Sources **SHOULD** list in `notices` only what is in force now, and leave the field out when there is nothing.
 - Sources **SHOULD** keep cancelled departures in the list with `cancelled: true` instead of dropping them, so
   someone waiting knows not to.
+- Sources **SHOULD NOT** give a cancelled departure a `notice` that only says it is cancelled. The card says it in its
+  own language, so a notice of `Cancelled` would read "Cancelled, Cancelled". Give the reason, or leave the notice out.
 - Sources **SHOULD** let the user choose how many departures to list. The card shows at most as many as the
   source provides.
 - Sources **SHOULD** refresh no more often than every 30 seconds.

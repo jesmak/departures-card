@@ -1,7 +1,7 @@
 {
     "common": {
         "name": "Lähdöt",
-        "description": "Seuraavat lähdöt pysäkeiltä ja rautatieasemilta",
+        "description": "Seuraavat lähdöt pysäkeiltä, rautatieasemilta ja lentoasemilta",
         "invalid_configuration": "Virheellinen konfiguraatio. Lisää vähintään yksi pysäkkianturi.",
         "no_entity": "Entiteettiä {entity} ei löydy",
         "not_departures": "{entity} ei ole pysäkkianturi",
@@ -12,6 +12,7 @@
         "cancelled": "Peruttu",
         "track": "Raide",
         "platform": "Laituri",
+        "gate": "Portti",
         "realtime": "Reaaliaikainen arvio"
     },
     "editor": {

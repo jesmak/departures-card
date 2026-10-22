@@ -21,5 +21,6 @@ export const MODE_COLORS: Record<string, string> = {
     metro: "var(--departures-metro-color, #d9480f)",
     train: "var(--departures-train-color, #1b7a3e)",
     ferry: "var(--departures-ferry-color, #00639a)",
+    plane: "var(--departures-plane-color, #6741d9)",
     other: "var(--departures-other-color, #5f6b76)",
 };
