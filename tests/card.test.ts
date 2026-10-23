@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "../src/departures-card";
 import type { DeparturesCard } from "../src/departures-card";
-import { compactSections } from "../src/editor";
+import { compactSections, formData } from "../src/editor";
 import type { HomeAssistant } from "../src/hass";
 import type { Departure, DeparturesCardConfig } from "../src/types";
 
@@ -391,5 +391,29 @@ describe("the editor", () => {
             "sensor.a",
             { entity: "sensor.b", name: "B" },
         ]);
+    });
+
+    it("shows an option left empty in YAML as its default, and a set one as it is", () => {
+        const empty = { departures: null, show_cancelled: null, show_notices: null, full_texts: null, combine: null };
+        const data = formData({ type: "custom:departures-card", entities: ["sensor.a"], ...empty } as never);
+        expect([data.departures, data.show_cancelled, data.show_notices, data.full_texts, data.combine]).toEqual([
+            4,
+            true,
+            true,
+            false,
+            false,
+        ]);
+        const set = formData({
+            type: "custom:departures-card",
+            entities: ["sensor.a"],
+            departures: 7,
+            full_texts: true,
+            show_cancelled: false,
+        });
+        expect([set.departures, set.full_texts, set.show_cancelled]).toEqual([7, true, false]);
+    });
+
+    it("takes one sensor written without a list, as the card does", () => {
+        expect(formData({ type: "custom:departures-card", entities: "sensor.a" } as never).entities).toEqual([{ entity: "sensor.a" }]);
     });
 });

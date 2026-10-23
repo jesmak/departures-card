@@ -51,11 +51,26 @@ function text(element: Element | null | undefined): string {
     return (element?.textContent ?? "").replace(/\s+/g, " ").trim();
 }
 
-const icons = (root: ParentNode) => [...root.querySelectorAll("ha-icon.direction")].map((icon) => icon.getAttribute("icon"));
+// Each icon with its tooltip, which says the same in words.
+const icons = (root: ParentNode) =>
+    [...root.querySelectorAll("ha-icon.direction")].map((icon) => `${icon.getAttribute("icon")} ${icon.getAttribute("title")}`);
+const TITLES: Record<string, string> = {
+    "mdi:airplane-takeoff": "Lähtevä",
+    "mdi:airplane-landing": "Saapuva",
+    "mdi:location-exit": "Lähtevä",
+    "mdi:location-enter": "Saapuva",
+};
+const titled = (expected: string[]) => expected.map((icon) => `${icon} ${TITLES[icon]}`);
 
 const DEPARTURES = { departures: [flight("ay1", 10), flight("ay3", 40)], direction: "departures" } satisfies Sensor;
 const ARRIVALS = { departures: [flight("ay2", 20), flight("ay4", 50)], direction: "arrivals" } satisfies Sensor;
 const BUSES = { departures: [flight("55", 15, { mode: "bus" }), flight("16", 45, { mode: "bus" })] } satisfies Sensor;
+// A station's trains: today's departures write no direction, and its arrivals do.
+const TRAINS = { departures: [flight("ic10", 12, { mode: "train" }), flight("ic12", 42, { mode: "train" })] } satisfies Sensor;
+const TRAIN_ARRIVALS = {
+    departures: [flight("ic11", 8, { mode: "train" }), flight("ic13", 38, { mode: "train" })],
+    direction: "arrivals",
+} satisfies Sensor;
 
 describe("arrivals and directions", () => {
     beforeEach(() => {
@@ -67,7 +82,7 @@ describe("arrivals and directions", () => {
         document.body.innerHTML = "";
     });
 
-    // Where the takeoff and landing icons go: the large row always has one on a plane, the rows only in one list that has
+    // Where the direction icons go: the large row always has one on a plane or a train, the rows only in one list that has
     // both directions in it. A card of one direction says it in its subtitle, and buses have no direction to show.
     it.each([
         ["departures alone", ["sensor.lahtevat"], false, ["mdi:airplane-takeoff"], []],
@@ -82,6 +97,59 @@ describe("arrivals and directions", () => {
         ],
         ["two airports' departures in one list", ["sensor.lahtevat", "sensor.toinen"], true, ["mdi:airplane-takeoff"], []],
         ["buses", ["sensor.bussit"], false, [], []],
+        ["a station's departures, which state no direction", ["sensor.juna"], false, ["mdi:location-exit"], []],
+        ["a station's arrivals", ["sensor.junat_saapuvat"], false, ["mdi:location-enter"], []],
+        ["a station's departures that say so", ["sensor.junat_lahtevat"], false, ["mdi:location-exit"], []],
+        ["a direction the card doesn't know, as departures", ["sensor.juna_outo"], false, ["mdi:location-exit"], []],
+        [
+            "a station's two sensors as two sections",
+            ["sensor.juna", "sensor.junat_saapuvat"],
+            false,
+            ["mdi:location-exit", "mdi:location-enter"],
+            [],
+        ],
+        [
+            "departures that say so with arrivals in one list",
+            ["sensor.junat_lahtevat", "sensor.junat_saapuvat"],
+            true,
+            ["mdi:location-enter"],
+            ["mdi:location-exit", "mdi:location-enter", "mdi:location-exit"],
+        ],
+        [
+            "departures, one unknown and one stated, in one list",
+            ["sensor.juna_outo", "sensor.junat_lahtevat"],
+            true,
+            ["mdi:location-exit"],
+            [],
+        ],
+        [
+            "a station's two stated sensors as two sections",
+            ["sensor.junat_lahtevat", "sensor.junat_saapuvat"],
+            false,
+            ["mdi:location-exit", "mdi:location-enter"],
+            [],
+        ],
+        [
+            "planes and trains both ways in one list",
+            ["sensor.lahtevat", "sensor.junat_saapuvat"],
+            true,
+            ["mdi:location-enter"],
+            ["mdi:airplane-takeoff", "mdi:location-enter", "mdi:airplane-takeoff"],
+        ],
+        [
+            "an unknown direction with arrivals in one list, as departures",
+            ["sensor.juna_outo", "sensor.junat_saapuvat"],
+            true,
+            ["mdi:location-enter"],
+            ["mdi:location-exit", "mdi:location-enter", "mdi:location-exit"],
+        ],
+        [
+            "a station both ways in one list",
+            ["sensor.juna", "sensor.junat_saapuvat"],
+            true,
+            ["mdi:location-enter"],
+            ["mdi:location-exit", "mdi:location-enter", "mdi:location-exit"],
+        ],
         [
             "buses and arrivals in one list",
             ["sensor.bussit", "sensor.saapuvat"],
@@ -95,10 +163,15 @@ describe("arrivals and directions", () => {
             "sensor.saapuvat": ARRIVALS,
             "sensor.toinen": { ...DEPARTURES, stop_name: "Toinen" },
             "sensor.bussit": BUSES,
+            "sensor.juna": TRAINS,
+            "sensor.junat_saapuvat": TRAIN_ARRIVALS,
+            "sensor.junat_lahtevat": { ...TRAINS, direction: "departures" },
+            // A source can write any direction, though the type knows only two.
+            "sensor.juna_outo": { ...TRAINS, direction: "sideways" } as unknown as Sensor,
         });
         const root = (await card(state, { entities, combine, departures: 10 })).shadowRoot!;
-        expect([...root.querySelectorAll(".next")].flatMap(icons)).toEqual(large);
-        expect([...root.querySelectorAll(".rows")].flatMap(icons)).toEqual(rows);
+        expect([...root.querySelectorAll(".next")].flatMap(icons)).toEqual(titled(large));
+        expect([...root.querySelectorAll(".rows")].flatMap(icons)).toEqual(titled(rows));
     });
 
     it("names a sensor's direction under its name, unless the subtitle is set, and a bus stop's not at all", async () => {
@@ -129,15 +202,15 @@ describe("arrivals and directions", () => {
         expect(text(row)).toBe("11.48 AY5 Oulu +13 min Laskeutunut Matkatavarat myöhässä Aula 2A");
     });
 
-    it("lists only the two latest that have landed, in the count", async () => {
+    it("lists only the two latest that have landed, besides the count", async () => {
         const landed = [-25, -20, -15, -10].map((minutes, index) => flight(`ay${index}`, minutes, { arrived: true }));
         const state = hass({ "sensor.saapuvat": { departures: [...landed, flight("ay8", 5), flight("ay9", 15)], direction: "arrivals" } });
         const root = (await card(state, { entities: ["sensor.saapuvat"], departures: 3 })).shadowRoot!;
         expect(text(root.querySelector(".next .badge"))).toBe("AY8");
-        expect([...root.querySelectorAll(".row .badge")].map(text)).toEqual(["AY2", "AY3"]);
+        expect([...root.querySelectorAll(".row .badge")].map(text)).toEqual(["AY2", "AY3", "AY9"]);
     });
 
-    it("lists the two latest landed of the whole list, and a cancelled one as cancelled, not landed", async () => {
+    it("lists the two latest over of the whole list, a cancelled one among them as cancelled, not landed", async () => {
         const state = hass({
             "sensor.saapuvat": {
                 departures: [flight("ay1", -25, { arrived: true }), flight("ay3", -10, { arrived: true })],
@@ -154,7 +227,7 @@ describe("arrivals and directions", () => {
             },
         });
         const root = (await card(state, { entities: ["sensor.saapuvat", "sensor.toiset"], combine: true, departures: 10 })).shadowRoot!;
-        expect([...root.querySelectorAll(".row .badge")].map(text)).toEqual(["AY2", "AY3", "AY4"]);
+        expect([...root.querySelectorAll(".row .badge")].map(text)).toEqual(["AY3", "AY4"]);
         expect(text(root.querySelector(".row.cancelled"))).toBe("11.55 AY4 Oulu Peruttu");
         expect(root.querySelector(".row.cancelled.came-in")).toBeNull();
     });
@@ -300,6 +373,40 @@ describe("arrivals and directions", () => {
         element.setConfig({ type: "custom:departures-card", entities: ["sensor.a", "sensor.a"], departures: 4, combine: true });
         expect(element.getCardSize(), "one sensor twice is two sections, as drawn").toBe(13);
     });
+
+    it.each([
+        [1, 4],
+        [10, 13],
+        [undefined, 7],
+        [null, 7],
+    ])("takes %j departures, a size of %s", (departures, size) => {
+        const element = document.createElement("departures-card");
+        element.setConfig({ type: "custom:departures-card", entities: ["sensor.a"], departures } as never);
+        expect(element.getCardSize()).toBe(size);
+    });
+
+    it.each([0, -1, 2.5, "3", "", true, Infinity, NaN])("refuses %j departures", (departures) => {
+        const element = document.createElement("departures-card");
+        expect(() => element.setConfig({ type: "custom:departures-card", entities: ["sensor.a"], departures } as never)).toThrow(
+            "The number of departures must be a whole number",
+        );
+    });
+
+    it("has room for the two that are over when it shows arrivals", () => {
+        const element = document.createElement("departures-card");
+        element.hass = hass({ "sensor.lahtevat": DEPARTURES, "sensor.saapuvat": ARRIVALS });
+        element.setConfig({ type: "custom:departures-card", entities: ["sensor.lahtevat", "sensor.saapuvat"], departures: 4 });
+        expect(element.getCardSize()).toBe(15);
+        element.setConfig({
+            type: "custom:departures-card",
+            entities: ["sensor.lahtevat", "sensor.saapuvat"],
+            departures: 4,
+            combine: true,
+        });
+        expect(element.getCardSize()).toBe(9);
+        element.setConfig({ type: "custom:departures-card", entities: ["sensor.lahtevat"], departures: 4 });
+        expect(element.getCardSize()).toBe(7);
+    });
 });
 
 // How long a departure stays past its time, and which one is large: a departure a minute, an arrival half an hour, which
@@ -313,13 +420,137 @@ describe("visibleDepartures with arrivals", () => {
 
     it.each([
         ["departures", -0.5, true],
+        ["departures", -1, true],
         ["departures", -2, false],
         ["arrivals", -2, true],
         ["arrivals", -29, true],
+        ["arrivals", -30, true],
         ["arrivals", -31, false],
     ] as const)("a %s %s minutes past is listed: %s", (direction, minutes, listed) => {
         const { next, rest } = visibleDepartures([shown(direction, minutes, { arrived: direction === "arrivals" })], NOW, 4, true);
         expect([next, ...rest].filter(Boolean).length).toBe(listed ? 1 : 0);
+    });
+
+    // The count is of those still to come, the large one included. The latest two that are over are listed besides it, so
+    // a busy half hour doesn't push what's coming off the card.
+    it.each([
+        [1, [-20], [10, 20], "arrivals10", ["arrivals-20"]],
+        [2, [-25, -20, -15], [10, 20, 30], "arrivals10", ["arrivals-20", "arrivals-15", "arrivals20"]],
+        [3, [], [10, 20, 30, 40], "arrivals10", ["arrivals20", "arrivals30"]],
+        [3, [-20, -10], [10, 20, 30], "arrivals10", ["arrivals-20", "arrivals-10", "arrivals20", "arrivals30"]],
+        [2, [-10], [], undefined, ["arrivals-10"]],
+    ] as const)(
+        "with a count of %s, came in %j and coming %j, the large one is %s and the rows %j",
+        (count, cameIn, coming, large, rows) => {
+            const list = [
+                ...cameIn.map((minutes) => shown("arrivals", minutes, { arrived: true })),
+                ...coming.map((minutes) => shown("arrivals", minutes)),
+            ];
+            const { next, rest } = visibleDepartures(list, NOW, count, true);
+            expect(next?.key).toBe(large);
+            expect(rest.map((item) => item.key)).toEqual(rows);
+        },
+    );
+
+    // Over is an arrival that has come in, or one cancelled and past its time: the latest two are listed besides the
+    // count. A cancelled one still to come isn't counted, and is never the large one.
+    it.each([
+        [
+            "cancelled ones past their time",
+            3,
+            true,
+            [[-20, "cancelled"], [-10, "cancelled"], [10], [20], [30]],
+            "10",
+            ["-20", "-10", "20", "30"],
+        ],
+        ["a cancelled one still to come", 2, true, [[5, "cancelled"], [10], [20]], "10", ["5", "20"]],
+        ["one still to come earlier than one in", 3, true, [[-20], [-15], [-10, "arrived"]], "-20", ["-15", "-10"]],
+        ["fewer still to come than the count", 4, true, [[-10, "arrived"], [10]], "10", ["-10"]],
+        ["cancelled ones hidden", 2, false, [[-10, "cancelled"], [10], [20]], "10", ["20"]],
+        ["a cancelled one that came in", 2, true, [[-5, "arrived", "cancelled"], [10], [20]], "10", ["-5", "20"]],
+        ["a cancelled one due now, still to come", 2, true, [[0, "cancelled"], [10], [20]], "10", ["0", "20"]],
+        [
+            "every one still to come cancelled, one over",
+            1,
+            true,
+            [
+                [-10, "arrived"],
+                [5, "cancelled"],
+                [10, "cancelled"],
+            ],
+            undefined,
+            ["-10", "5"],
+        ],
+        ["a cancelled one at exactly half an hour past, over", 2, true, [[-30, "cancelled"], [10]], "10", ["-30"]],
+        ["a cancelled one marked come in, before its time", 2, true, [[5, "arrived", "cancelled"], [10], [20]], "10", ["5", "20"]],
+    ] as const)("%s", (_case, count, showCancelled, items, large, rows) => {
+        const list = items.map(([minutes, ...flags]) =>
+            shown("arrivals", minutes, { arrived: flags.includes("arrived" as never), cancelled: flags.includes("cancelled" as never) }),
+        );
+        const { next, rest } = visibleDepartures(list, NOW, count, showCancelled);
+        expect(next?.key).toBe(large === undefined ? undefined : `arrivals${large}`);
+        expect(rest.map((item) => item.key)).toEqual(rows.map((minutes) => `arrivals${minutes}`));
+    });
+
+    // The count is of those not cancelled, the large one included. Cancelled ones before the last counted are listed too,
+    // in their place by time, so a run of cancellations never pushes the next one that runs off the card.
+    it.each([
+        ["departures", 1, [[5, "cancelled"], [10], [20]], "10", ["5"]],
+        ["departures", 2, [[5], [10, "cancelled"], [20], [30, "cancelled"]], "5", ["10", "20"]],
+        [
+            "departures",
+            2,
+            [
+                [5, "cancelled"],
+                [10, "cancelled"],
+            ],
+            undefined,
+            ["5", "10"],
+        ],
+        ["departures", 1, [[5], [10, "cancelled"]], "5", []],
+        ["arrivals", 1, [[5, "cancelled"], [10], [20]], "10", ["5"]],
+        ["departures", 2, [[5], [10, "cancelled"], [20, "cancelled"]], "5", ["10"]],
+        ["departures", 2, [[5, "cancelled"], [10, "cancelled"], [20]], "20", ["5", "10"]],
+        ["departures", 2, [[5, "cancelled"], [10, "cancelled"], [20], [30, "cancelled"]], "20", ["5", "10"]],
+        ["departures", 3, [[5], [10, "cancelled"]], "5", ["10"]],
+        ["departures", 3, [[5], [10]], "5", ["10"]],
+        [
+            "departures",
+            2,
+            [
+                [5, "cancelled"],
+                [10, "cancelled"],
+                [20, "cancelled"],
+                [30, "cancelled"],
+            ],
+            undefined,
+            ["5", "10"],
+        ],
+        ["departures", 3, [[1, "cancelled"], [2], [3, "cancelled"], [4, "cancelled"], [5, "cancelled"]], "2", ["1", "3"]],
+        [
+            "arrivals",
+            1,
+            [
+                [5, "cancelled"],
+                [10, "cancelled"],
+                [20, "cancelled"],
+            ],
+            undefined,
+            ["5"],
+        ],
+        ["arrivals", 2, [[-10, "cancelled"], [5, "cancelled"], [10], [20]], "10", ["-10", "5", "20"]],
+    ] as const)("%s with a count of %s that aren't cancelled: %j", (direction, count, items, large, rows) => {
+        const list = items.map(([minutes, ...flags]) => shown(direction, minutes, { cancelled: flags.includes("cancelled" as never) }));
+        const { next, rest } = visibleDepartures(list, NOW, count, true);
+        expect(next?.key).toBe(large === undefined ? undefined : `${direction}${large}`);
+        expect(rest.map((item) => item.key)).toEqual(rows.map((minutes) => `${direction}${minutes}`));
+    });
+
+    it("never makes a departure over, cancelled and past or not", () => {
+        // Three cancelled within the minute: over would keep only the latest two of them.
+        const list = [-0.9, -0.6, -0.3].map((minutes) => shown("departures", minutes, { cancelled: true }));
+        const { next, rest } = visibleDepartures([...list, shown("departures", 5)], NOW, 1, true);
+        expect([next?.key, ...rest.map((item) => item.key)]).toEqual(["departures5", "departures-0.9", "departures-0.6", "departures-0.3"]);
     });
 
     it("never makes one that has come in the large one", () => {

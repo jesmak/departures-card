@@ -1,4 +1,4 @@
-/*! departures-card 1.2.0 | MIT License */
+/*! departures-card 1.3.0 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,7 +711,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.2.0";
+var CARD_VERSION = "1.3.0";
 var DEPARTURES_VERSION = 1;
 var DEFAULT_DEPARTURES = 4;
 var GONE_AFTER_MS = 6e4;
@@ -756,14 +756,30 @@ function departuresSensors(hass) {
 }
 function visibleDepartures(departures, now, count, showCancelled) {
   const upcoming = departures.filter(
-    (departure) => Date.parse(departure.estimated) > now - (departure.direction === "arrivals" ? ARRIVED_KEPT_MS : GONE_AFTER_MS)
+    (departure) => Date.parse(departure.estimated) >= now - (departure.direction === "arrivals" ? ARRIVED_KEPT_MS : GONE_AFTER_MS)
   ).filter((departure) => showCancelled || !departure.cancelled).sort((a3, b3) => Date.parse(a3.estimated) - Date.parse(b3.estimated));
-  const arrived = upcoming.filter((departure) => departure.arrived && !departure.cancelled);
-  const dropped = new Set(arrived.slice(0, Math.max(arrived.length - ARRIVED_ROWS, 0)));
-  const kept = upcoming.filter((departure) => !dropped.has(departure));
-  const next = kept.find((departure) => !departure.cancelled && !departure.arrived);
-  const rest = kept.filter((departure) => departure !== next).slice(0, Math.max(count - (next ? 1 : 0), 0));
+  const over = (departure) => departure.direction === "arrivals" && (departure.cancelled ? Date.parse(departure.estimated) < now : !!departure.arrived);
+  const arrived = upcoming.filter(over).slice(-ARRIVED_ROWS);
+  const coming = upcoming.filter((departure) => !over(departure));
+  const listed = counted(coming, count);
+  const next = listed.find((departure) => !departure.cancelled);
+  const rest = [...arrived, ...listed.filter((departure) => departure !== next)].sort(
+    (a3, b3) => Date.parse(a3.estimated) - Date.parse(b3.estimated)
+  );
   return { next, rest };
+}
+function counted(departures, count) {
+  let last = -1;
+  let counting = 0;
+  for (const [index, departure] of departures.entries()) {
+    if (counting >= count) break;
+    if (!departure.cancelled) {
+      last = index;
+      counting++;
+    }
+  }
+  const listed = departures.slice(0, last + 1);
+  return counting >= count ? listed : [...listed, ...departures.slice(last + 1, count)];
 }
 function isDeparture(value) {
   const departure = value;
@@ -815,6 +831,7 @@ var en_default = {
     name: "Departures",
     description: "The next departures from stops, railway stations and airports",
     invalid_configuration: "Invalid configuration. Add at least one departures sensor.",
+    invalid_departures: "Invalid configuration. The number of departures must be a whole number, at least 1.",
     no_entity: "Entity {entity} not found",
     not_departures: "{entity} is not a departures sensor",
     unavailable: "Departures are not available right now",
@@ -846,7 +863,7 @@ var en_default = {
     subtitle: "Subtitle",
     subtitle_helper: "Such as the direction, towards the centre. Not used in one list.",
     departures: "Departures shown",
-    departures_helper: "Per stop, or in the whole list when the stops are one list",
+    departures_helper: "Per stop, or in the whole list when the stops are one list. Cancelled departures among them show too, and the arrivals list also shows at most the latest two that have come in or were cancelled.",
     show_cancelled: "Show cancelled departures",
     show_notices: "Show notices",
     show_notices_helper: "Track works and other notices for the whole stop, under its name",
@@ -863,6 +880,7 @@ var fi_default = {
     name: "L\xE4hd\xF6t",
     description: "Seuraavat l\xE4hd\xF6t pys\xE4keilt\xE4, rautatieasemilta ja lentoasemilta",
     invalid_configuration: "Virheellinen konfiguraatio. Lis\xE4\xE4 v\xE4hint\xE4\xE4n yksi pys\xE4kkianturi.",
+    invalid_departures: "Virheellinen konfiguraatio. L\xE4ht\xF6jen m\xE4\xE4r\xE4n pit\xE4\xE4 olla kokonaisluku, v\xE4hint\xE4\xE4n 1.",
     no_entity: "Entiteetti\xE4 {entity} ei l\xF6ydy",
     not_departures: "{entity} ei ole pys\xE4kkianturi",
     unavailable: "L\xE4ht\xF6tiedot eiv\xE4t ole juuri nyt saatavilla",
@@ -894,7 +912,7 @@ var fi_default = {
     subtitle: "Alaotsikko",
     subtitle_helper: "Esimerkiksi suunta, keskustaan p\xE4in. Ei k\xE4yt\xF6ss\xE4 yhten\xE4 listana.",
     departures: "N\xE4ytett\xE4vi\xE4 l\xE4ht\xF6j\xE4",
-    departures_helper: "Pys\xE4kki\xE4 kohden, tai koko listassa, kun pys\xE4kit ovat yhten\xE4 listana",
+    departures_helper: "Pys\xE4kki\xE4 kohden, tai koko listassa, kun pys\xE4kit ovat yhten\xE4 listana. Perutut vuorot niiden v\xE4liss\xE4 n\xE4kyv\xE4t lis\xE4ksi, ja saapuvien listalla n\xE4ytet\xE4\xE4n enint\xE4\xE4n kaksi viimeisint\xE4 saapunutta tai peruttua.",
     show_cancelled: "N\xE4yt\xE4 perutut l\xE4hd\xF6t",
     show_notices: "N\xE4yt\xE4 tiedotteet",
     show_notices_helper: "Rataty\xF6t ja muut koko pys\xE4kki\xE4 koskevat tiedotteet sen nimen alla",
@@ -975,6 +993,11 @@ var OPTIONS_SCHEMA = [
     ]
   }
 ];
+function formData(config) {
+  const set = Object.fromEntries(Object.entries(config).filter(([, value]) => value != null));
+  const entities = typeof config.entities === "string" ? [config.entities] : config.entities;
+  return { ...DEFAULTS, ...set, entities: sectionsOf(entities) };
+}
 function compactSections(sections) {
   return sectionsOf(sections).map((section) => {
     const entry = { entity: section.entity };
@@ -999,7 +1022,7 @@ var DeparturesCardEditor = class extends i4 {
     if (!this.hass) {
       return A;
     }
-    const data = { ...DEFAULTS, ...this.config, entities: sectionsOf(this.config.entities) };
+    const data = formData(this.config);
     return b2`
             <ha-form
                 .hass=${this.hass}
@@ -1066,6 +1089,10 @@ DeparturesCardEditor = __decorateClass([
 ], DeparturesCardEditor);
 
 // src/departures-card.ts
+var DIRECTION_ICONS = {
+  plane: { departing: "mdi:airplane-takeoff", arriving: "mdi:airplane-landing" },
+  train: { departing: "mdi:location-exit", arriving: "mdi:location-enter" }
+};
 console.info(
   `%c  DEPARTURES-CARD 
 %c  ${CARD_VERSION}    `,
@@ -1098,15 +1125,22 @@ var DeparturesCard = class extends i4 {
     if (!config || !Array.isArray(entities) || sectionsOf(entities).length === 0) {
       throw new Error(translate(browserLanguage(), "common.invalid_configuration"));
     }
+    if (config.departures != null && !(Number.isInteger(config.departures) && config.departures >= 1)) {
+      throw new Error(translate(browserLanguage(), "common.invalid_departures"));
+    }
     this.config = { ...config, entities };
   }
   /** One list only from two different sensors or more: one sensor given twice has nothing to merge. */
   get combines() {
     return !!this.config?.combine && new Set(sectionsOf(this.config.entities).map((section) => section.entity)).size > 1;
   }
+  /** A list with arrivals can be two rows longer than its count, for the ones that are over. Cancelled ones lengthen any
+   * list too, which the size can't know before it has the departures. */
   getCardSize() {
-    const sections = this.config && !this.combines ? sectionsOf(this.config.entities).length : 1;
-    return 1 + sections * (2 + (this.config?.departures ?? DEFAULT_DEPARTURES));
+    const rows = this.config?.departures ?? DEFAULT_DEPARTURES;
+    const entities = this.config ? sectionsOf(this.config.entities).map((section) => section.entity) : [];
+    const list = (ids) => 2 + rows + (ids.some((id) => statedDirection(this.hass?.states[id]) === "arrivals") ? ARRIVED_ROWS : 0);
+    return 1 + (!this.config || this.combines ? list(entities) : entities.reduce((size, id) => size + list([id]), 0));
   }
   /** In a sections view the card takes a whole section by default and is never narrower than half of one. */
   getGridOptions() {
@@ -1329,15 +1363,19 @@ var DeparturesCard = class extends i4 {
             </div>
         `;
   }
-  /** A plane's takeoff or landing in front of its destination or origin. Other modes have none yet. */
+  /**
+   * Which way a plane or a train goes, in front of its destination or origin: a plane takes off or lands, a train
+   * leaves or comes in by a door, as no icon shows a train arriving. Buses and the rest have no direction to show.
+   */
   directionIcon(departure) {
-    if (departure.mode !== "plane") {
+    const icons = DIRECTION_ICONS[departure.mode];
+    if (!icons) {
       return A;
     }
     const arriving = departure.direction === "arrivals";
     return b2`<ha-icon
             class="direction"
-            icon=${arriving ? "mdi:airplane-landing" : "mdi:airplane-takeoff"}
+            icon=${arriving ? icons.arriving : icons.departing}
             title=${this.text(arriving ? "common.arriving" : "common.departing")}
         ></ha-icon>`;
   }
@@ -1668,7 +1706,7 @@ var DeparturesCard = class extends i4 {
                 font-weight: var(--ha-font-weight-medium, 500);
             }
 
-            /* Takeoff and landing are mirror images, so the icon is a size larger than the text around it. */
+            /* A direction icon is a size larger than the text around it, so its arrow reads at a glance. */
             .direction {
                 --mdc-icon-size: 17px;
                 width: 17px;

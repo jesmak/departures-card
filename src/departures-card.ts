@@ -10,7 +10,7 @@ import type { CSSResultGroup, PropertyValues, TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 
-import { CARD_VERSION, DEFAULT_DEPARTURES, TICK_MS } from "./const";
+import { ARRIVED_ROWS, CARD_VERSION, DEFAULT_DEPARTURES, TICK_MS } from "./const";
 import {
     badgeColors,
     clock,
@@ -29,6 +29,12 @@ import "./editor";
 import type { HassEntity, HomeAssistant } from "./hass";
 import { browserLanguage, translate } from "./localize/localize";
 import type { Departure, DeparturesCardConfig, SectionConfig, ShownDeparture } from "./types";
+
+/** The icons that show which way a departure goes, by mode. */
+const DIRECTION_ICONS: Record<string, { departing: string; arriving: string }> = {
+    plane: { departing: "mdi:airplane-takeoff", arriving: "mdi:airplane-landing" },
+    train: { departing: "mdi:location-exit", arriving: "mdi:location-enter" },
+};
 
 console.info(
     `%c  DEPARTURES-CARD \n%c  ${CARD_VERSION}    `,
@@ -77,6 +83,10 @@ export class DeparturesCard extends LitElement {
         if (!config || !Array.isArray(entities) || sectionsOf(entities).length === 0) {
             throw new Error(translate(browserLanguage(), "common.invalid_configuration"));
         }
+        // An empty `departures:` in YAML is null, the default as a missing one is.
+        if (config.departures != null && !(Number.isInteger(config.departures) && config.departures >= 1)) {
+            throw new Error(translate(browserLanguage(), "common.invalid_departures"));
+        }
         this.config = { ...config, entities };
     }
 
@@ -85,9 +95,14 @@ export class DeparturesCard extends LitElement {
         return !!this.config?.combine && new Set(sectionsOf(this.config.entities).map((section) => section.entity)).size > 1;
     }
 
+    /** A list with arrivals can be two rows longer than its count, for the ones that are over. Cancelled ones lengthen any
+     * list too, which the size can't know before it has the departures. */
     public getCardSize(): number {
-        const sections = this.config && !this.combines ? sectionsOf(this.config.entities).length : 1;
-        return 1 + sections * (2 + (this.config?.departures ?? DEFAULT_DEPARTURES));
+        const rows = this.config?.departures ?? DEFAULT_DEPARTURES;
+        const entities = this.config ? sectionsOf(this.config.entities).map((section) => section.entity) : [];
+        const list = (ids: string[]) =>
+            2 + rows + (ids.some((id) => statedDirection(this.hass?.states[id]) === "arrivals") ? ARRIVED_ROWS : 0);
+        return 1 + (!this.config || this.combines ? list(entities) : entities.reduce((size, id) => size + list([id]), 0));
     }
 
     /** In a sections view the card takes a whole section by default and is never narrower than half of one. */
@@ -353,15 +368,19 @@ export class DeparturesCard extends LitElement {
         `;
     }
 
-    /** A plane's takeoff or landing in front of its destination or origin. Other modes have none yet. */
+    /**
+     * Which way a plane or a train goes, in front of its destination or origin: a plane takes off or lands, a train
+     * leaves or comes in by a door, as no icon shows a train arriving. Buses and the rest have no direction to show.
+     */
     private directionIcon(departure: ShownDeparture): TemplateResult | typeof nothing {
-        if (departure.mode !== "plane") {
+        const icons = DIRECTION_ICONS[departure.mode];
+        if (!icons) {
             return nothing;
         }
         const arriving = departure.direction === "arrivals";
         return html`<ha-icon
             class="direction"
-            icon=${arriving ? "mdi:airplane-landing" : "mdi:airplane-takeoff"}
+            icon=${arriving ? icons.arriving : icons.departing}
             title=${this.text(arriving ? "common.arriving" : "common.departing")}
         ></ha-icon>`;
     }
@@ -705,7 +724,7 @@ export class DeparturesCard extends LitElement {
                 font-weight: var(--ha-font-weight-medium, 500);
             }
 
-            /* Takeoff and landing are mirror images, so the icon is a size larger than the text around it. */
+            /* A direction icon is a size larger than the text around it, so its arrow reads at a glance. */
             .direction {
                 --mdc-icon-size: 17px;
                 width: 17px;

@@ -50,10 +50,11 @@ export function departuresSensors(hass: HomeAssistant): string[] {
 /**
  * What a section shows: the next departure that isn't cancelled or in already, large, and the ones after it.
  *
- * Departures more than a minute gone are dropped, and arrivals half an hour after their time. Of those that have come
- * in, only the latest two stay. A cancelled departure or one that has come in
- * is never the large one, but stays in the rows, in its place by time, unless cancelled ones are hidden. `count` covers
- * all of them, the large one included.
+ * Departures more than a minute gone are dropped, and arrivals half an hour after their time. A cancelled one or one
+ * that has come in is never the large one, but stays in the rows, in its place by time, unless cancelled ones are
+ * hidden. `count` covers those still to come and not cancelled, the large one included, and the cancelled ones among
+ * them are listed too, filling a list short of `count` up to it. Arrivals that are over, come in or cancelled and past their time, are listed besides
+ * it, the latest two.
  */
 export function visibleDepartures(
     departures: ShownDeparture[],
@@ -63,16 +64,39 @@ export function visibleDepartures(
 ): { next?: ShownDeparture; rest: ShownDeparture[] } {
     const upcoming = departures
         .filter(
-            (departure) => Date.parse(departure.estimated) > now - (departure.direction === "arrivals" ? ARRIVED_KEPT_MS : GONE_AFTER_MS),
+            (departure) => Date.parse(departure.estimated) >= now - (departure.direction === "arrivals" ? ARRIVED_KEPT_MS : GONE_AFTER_MS),
         )
         .filter((departure) => showCancelled || !departure.cancelled)
         .sort((a, b) => Date.parse(a.estimated) - Date.parse(b.estimated));
-    const arrived = upcoming.filter((departure) => departure.arrived && !departure.cancelled);
-    const dropped = new Set(arrived.slice(0, Math.max(arrived.length - ARRIVED_ROWS, 0)));
-    const kept = upcoming.filter((departure) => !dropped.has(departure));
-    const next = kept.find((departure) => !departure.cancelled && !departure.arrived);
-    const rest = kept.filter((departure) => departure !== next).slice(0, Math.max(count - (next ? 1 : 0), 0));
+    // Over: an arrival that has come in, or one cancelled and past its time.
+    const over = (departure: ShownDeparture) =>
+        departure.direction === "arrivals" && (departure.cancelled ? Date.parse(departure.estimated) < now : !!departure.arrived);
+    const arrived = upcoming.filter(over).slice(-ARRIVED_ROWS);
+    const coming = upcoming.filter((departure) => !over(departure));
+    const listed = counted(coming, count);
+    const next = listed.find((departure) => !departure.cancelled);
+    const rest = [...arrived, ...listed.filter((departure) => departure !== next)].sort(
+        (a, b) => Date.parse(a.estimated) - Date.parse(b.estimated),
+    );
     return { next, rest };
+}
+
+/**
+ * The first `count` not cancelled, in order, with the cancelled ones among them. When fewer than `count` aren't
+ * cancelled, as in a strike, the cancelled ones after the last of them fill the list up to `count`.
+ */
+function counted(departures: ShownDeparture[], count: number): ShownDeparture[] {
+    let last = -1;
+    let counting = 0;
+    for (const [index, departure] of departures.entries()) {
+        if (counting >= count) break;
+        if (!departure.cancelled) {
+            last = index;
+            counting++;
+        }
+    }
+    const listed = departures.slice(0, last + 1);
+    return counting >= count ? listed : [...listed, ...departures.slice(last + 1, count)];
 }
 
 /** The attribute comes from any source, so a departure without the required fields is skipped rather than drawn broken. */

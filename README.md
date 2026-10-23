@@ -14,7 +14,7 @@ the departures format.
 
 ## What is it?
 
-A custom card that shows when the next bus, tram, train or flight leaves, or the next flight lands. Each stop is a
+A custom card that shows when the next bus, tram, train or flight leaves, or the next train or flight comes in. Each stop is a
 section of its own, with the next departure large, its line, destination and a countdown, and the ones after it as rows
 below. Several stops fit in one card, such as both sides of a street or an airport's departures and arrivals. They sit
 side by side when the card is wide enough, or make one list by time.
@@ -26,8 +26,8 @@ The card reads sensors in the [departures format](docs/departures-format.md), so
 writes it:
 
 - [Digitransit Live](https://github.com/jesmak/digitransit_live): bus, tram and metro stops anywhere in Finland.
-- [Digitraffic Live](https://github.com/jesmak/digitraffic_live): Finnish railway stations, optionally only the
-  trains that stop at another station later, such as Helsinki → Tampere.
+- [Digitraffic Live](https://github.com/jesmak/digitraffic_live): departures and arrivals at Finnish railway stations,
+  the departures optionally only the trains that stop at another station later, such as Helsinki → Tampere.
 - [Finavia Flights](https://github.com/jesmak/finavia_flights): departures and arrivals at Finavia's airports in
   Finland.
 
@@ -53,16 +53,16 @@ you make one, give its repository the topic too. A template entity can write the
 
 ## Options
 
-| Name             | Type    | Default  | Description                                                                                                            |
-| ---------------- | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `type`           | string  | required | `custom:departures-card`                                                                                               |
-| `entities`       | list    | required | Departures sensors, each shown as a section or all as one list with `combine`, as an entity id or one with its heading |
-| `title`          | string  |          | Shown at the top of the card                                                                                           |
-| `departures`     | number  | `4`      | How many departures each stop shows, or the whole list with `combine`, the large one included                          |
-| `show_cancelled` | boolean | `true`   | Show cancelled departures, struck through with the reason                                                              |
-| `show_notices`   | boolean | `true`   | Show the stop's notices, such as track works, under its name                                                           |
-| `full_texts`     | boolean | `false`  | Wrap the subtitle and the notices of later departures instead of cutting them short                                    |
-| `combine`        | boolean | `false`  | Show every stop's departures and arrivals as one list by time, not a section each                                      |
+| Name             | Type    | Default  | Description                                                                                                                                                                          |
+| ---------------- | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `type`           | string  | required | `custom:departures-card`                                                                                                                                                             |
+| `entities`       | list    | required | Departures sensors, each shown as a section or all as one list with `combine`, as an entity id or one with its heading                                                               |
+| `title`          | string  |          | Shown at the top of the card                                                                                                                                                         |
+| `departures`     | number  | `4`      | How many departures not cancelled each stop shows, or the whole list with `combine`, the large one included, with the cancelled ones among them and up to two arrivals that are over |
+| `show_cancelled` | boolean | `true`   | Show cancelled departures, struck through with the reason                                                                                                                            |
+| `show_notices`   | boolean | `true`   | Show the stop's notices, such as track works, under its name                                                                                                                         |
+| `full_texts`     | boolean | `false`  | Wrap the subtitle and the notices of later departures instead of cutting them short                                                                                                  |
+| `combine`        | boolean | `false`  | Show every stop's departures and arrivals as one list by time, not a section each                                                                                                    |
 
 Each item of `entities` is an entity id, or an object with these keys:
 
@@ -86,13 +86,16 @@ Everything can be set in the card's visual editor.
 - **Track, platform or gate:** a train's track, a plane's gate, or another vehicle's platform, when the stop has them.
   An arriving plane's is its baggage hall.
 - **Cancellations:** a cancelled departure stays in the list, greyed and struck through, with the reason when the
-  integration gives one. It is never the large one, which is always the next departure you can actually take.
+  integration gives one. It is never the large one, which is always the next departure you can actually take, and it
+  isn't counted in the number of departures, so a run of cancellations doesn't push that one off the card.
 - **Arrivals:** a sensor that lists arrivals is headed "Arrivals", and one that says it lists departures "Departures".
   An arrival stays for half an hour after its time, and one that has come in shows when, dimmed and marked as landed or
-  arrived, with its delay and any notice. Only the latest two that have come in are listed, so a busy half hour doesn't
-  push what's coming off the list. The large one is the next arrival still to come.
-- **Takeoff and landing:** a plane's large departure or arrival has an icon in front of its destination or origin. In
-  one list of both directions (`combine`), every flight has it, so the departures and arrivals can be told apart.
+  arrived, with its delay and any notice. The latest two that are over, come in or cancelled and past their time, are
+  listed besides the number of departures, so a busy half hour doesn't push what's coming off the list. The large one is
+  the next arrival still to come.
+- **Which way it goes:** a plane's or a train's large departure or arrival has an icon in front of its destination or
+  origin, a plane's takeoff or landing and a train's exit or entry door. In one list of both directions (`combine`),
+  every plane and train has it, so the departures and arrivals can be told apart.
 - **Notices:** a notice about the departure itself, such as "Passengers are directed to train S 106", and the stop's
   own notices, such as track works with buses replacing trains, shown in full under its name.
 

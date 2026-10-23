@@ -65,6 +65,16 @@ const OPTIONS_SCHEMA = [
     },
 ];
 
+/**
+ * The form's values: the config over the defaults, every stop as an object. An option left empty in YAML is null, and
+ * shows its default, as the card uses it. One sensor may be written without a list around it, as the card takes it.
+ */
+export function formData(config: DeparturesCardConfig): Record<string, unknown> {
+    const set = Object.fromEntries(Object.entries(config).filter(([, value]) => value != null));
+    const entities: unknown = typeof config.entities === "string" ? [config.entities] : config.entities;
+    return { ...DEFAULTS, ...set, entities: sectionsOf(entities as DeparturesCardConfig["entities"]) };
+}
+
 /** A stop with nothing but its sensor is written as the plain entity id, so the configuration stays short. */
 export function compactSections(sections: SectionConfig[]): Array<string | SectionConfig> {
     return sectionsOf(sections).map((section) => {
@@ -93,7 +103,7 @@ export class DeparturesCardEditor extends LitElement {
             return nothing;
         }
         // The form edits every stop as an object; plain entity ids are expanded for it.
-        const data = { ...DEFAULTS, ...this.config, entities: sectionsOf(this.config.entities) };
+        const data = formData(this.config);
         // Two forms, so that the stops' helper, which Home Assistant's list of objects doesn't show, sits under the stops.
         return html`
             <ha-form

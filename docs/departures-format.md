@@ -101,9 +101,12 @@ hall. A sensor that lists both directions is two sensors, one each, so no other 
 
 The card shows an arrival until half an hour past its `estimated` time, rather than the minute it gives a departure, so
 someone meeting it still sees it after it has come in. One with `arrived: true` shows when it came in, dimmed, with its
-delay and notice, and the card says it has arrived in its own words. Only the latest two that have come in are listed.
-The large one is the next arrival that hasn't. The card names a sensor's
-direction under its name when the sensor says one, and in a list of both directions marks each row with it.
+delay and notice, and the card says it has arrived in its own words. A cancelled arrival stays as long. The card's count
+is of the arrivals still to come and not cancelled, and the cancelled ones among them are listed too. The latest two
+that are over, come in or cancelled and past their time, are listed besides them. The large one is the next arrival
+still to come that isn't cancelled. The card
+names a sensor's direction under its name when the sensor says one, and shows a plane's or a train's direction as an
+icon, always on the large one, and on every row in a list of both directions.
 
 ## Rules for sources
 
@@ -117,12 +120,17 @@ direction under its name when the sensor says one, and in a list of both directi
 - Sources **SHOULD** keep cancelled departures in the list with `cancelled: true` instead of dropping them, so
   someone waiting knows not to.
 - Arrivals sources **SHOULD** set `arrived` once an arrival has come in, and give its actual time of arrival as
-  `estimated` when they have one, rather than an estimate made before it. They **SHOULD** keep an arrival for half an hour after it has come in, as the card
-  does, and **SHOULD NOT** give it a `notice` that only says it has arrived.
+  `estimated` when they have one, rather than an estimate made before it. They **SHOULD** keep an arrival for half an
+  hour after it has come in, as the card does, and list the user's number of arrivals still to come with the latest two
+  that are over besides them. A cancelled arrival hasn't come in, whatever else
+  the source knows of it. They **SHOULD NOT** give an arrival a `notice`
+  that only says it has arrived.
 - Sources **SHOULD NOT** give a cancelled departure a `notice` that only says it is cancelled. The card says it in its
   own language, so a notice of `Cancelled` would read "Cancelled, Cancelled". Give the reason, or leave the notice out.
-- Sources **SHOULD** let the user choose how many departures to list. The card shows at most as many as the
-  source provides.
+- Sources **SHOULD** let the user choose how many departures to list, and count only those not cancelled, listing the
+  cancelled ones among them too, as the card does, so a run of cancellations doesn't push the next departure off the
+  list. When fewer than that aren't cancelled, as in a strike, they **SHOULD** fill the list up to the number with the
+  cancelled ones after, and no further. The card shows at most as many as the source provides.
 - Sources **SHOULD** refresh no more often than every 30 seconds.
 - Sources **SHOULD** leave out fields that have no value instead of writing `null`. The card treats `null` as
   missing.
