@@ -13,23 +13,34 @@
         "track": "Raide",
         "platform": "Laituri",
         "gate": "Portti",
-        "realtime": "Reaaliaikainen arvio"
+        "realtime": "Reaaliaikainen arvio",
+        "departures": "Lähtevät",
+        "arrivals": "Saapuvat",
+        "no_arrivals": "Ei saapuvia",
+        "hall": "Aula",
+        "landed": "Laskeutunut",
+        "arrived": "Saapunut",
+        "departing": "Lähtevä",
+        "arriving": "Saapuva",
+        "entity_unavailable": "{entity} ei ole juuri nyt saatavilla"
     },
     "editor": {
         "title": "Otsikko",
         "entities": "Pysäkit",
-        "entities_helper": "Pysäkkianturit, kukin omana osionaan. Kadun molemmat puolet mahtuvat samaan korttiin.",
+        "entities_helper": "Pysäkkianturit, kukin omana osionaan tai kaikki yhtenä listana. Kadun molemmat puolet mahtuvat samaan korttiin.",
         "entity": "Pysäkkianturi",
         "name": "Nimi",
         "name_helper": "Korvaa pysäkin oman nimen",
         "subtitle": "Alaotsikko",
-        "subtitle_helper": "Esimerkiksi suunta, keskustaan päin",
-        "departures": "Lähtöjä pysäkiltä",
-        "departures_helper": "Seuraava isona ja loput sen alla",
+        "subtitle_helper": "Esimerkiksi suunta, keskustaan päin. Ei käytössä yhtenä listana.",
+        "departures": "Näytettäviä lähtöjä",
+        "departures_helper": "Pysäkkiä kohden, tai koko listassa, kun pysäkit ovat yhtenä listana",
         "show_cancelled": "Näytä perutut lähdöt",
         "show_notices": "Näytä tiedotteet",
         "show_notices_helper": "Ratatyöt ja muut koko pysäkkiä koskevat tiedotteet sen nimen alla",
         "full_texts": "Näytä tekstit kokonaan",
-        "full_texts_helper": "Alaotsikko ja myöhempien lähtöjen tiedotteet rivitetään lyhentämisen sijaan"
+        "full_texts_helper": "Alaotsikko ja myöhempien lähtöjen tiedotteet rivitetään lyhentämisen sijaan",
+        "combine": "Näytä yhtenä listana",
+        "combine_helper": "Kaikkien pysäkkien lähdöt ja saapumiset yhdessä listassa aikajärjestyksessä"
     }
 }

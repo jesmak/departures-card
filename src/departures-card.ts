@@ -3,7 +3,7 @@
  * writes the departures format (docs/departures-format.md).
  *
  * Each sensor is a section: its next departure large, with a countdown, and the ones after it as rows.
- * Sections sit side by side when the card is wide enough for two, and stack otherwise.
+ * Sections sit side by side when the card is wide enough for two, and stack otherwise, or are one list by time.
  */
 import { LitElement, css, html, nothing } from "lit";
 import type { CSSResultGroup, PropertyValues, TemplateResult } from "lit";
@@ -20,13 +20,15 @@ import {
     isDeparturesSensor,
     minutesUntil,
     sectionsOf,
+    shownDepartures,
+    statedDirection,
     stopNotices,
     visibleDepartures,
 } from "./departures";
 import "./editor";
-import type { HomeAssistant } from "./hass";
+import type { HassEntity, HomeAssistant } from "./hass";
 import { browserLanguage, translate } from "./localize/localize";
-import type { Departure, DeparturesCardConfig, SectionConfig } from "./types";
+import type { Departure, DeparturesCardConfig, SectionConfig, ShownDeparture } from "./types";
 
 console.info(
     `%c  DEPARTURES-CARD \n%c  ${CARD_VERSION}    `,
@@ -78,8 +80,13 @@ export class DeparturesCard extends LitElement {
         this.config = { ...config, entities };
     }
 
+    /** One list only from two different sensors or more: one sensor given twice has nothing to merge. */
+    private get combines(): boolean {
+        return !!this.config?.combine && new Set(sectionsOf(this.config.entities).map((section) => section.entity)).size > 1;
+    }
+
     public getCardSize(): number {
-        const sections = this.config ? sectionsOf(this.config.entities).length : 1;
+        const sections = this.config && !this.combines ? sectionsOf(this.config.entities).length : 1;
         return 1 + sections * (2 + (this.config?.departures ?? DEFAULT_DEPARTURES));
     }
 
@@ -160,7 +167,7 @@ export class DeparturesCard extends LitElement {
         return html`
             <ha-card class=${this.config.full_texts ? "full" : ""}>
                 ${this.config.title ? html`<h1 class="card-title">${this.config.title}</h1>` : nothing}
-                <div class="sections">${sections.map((section) => this.section(section))}</div>
+                <div class="sections">${this.combines ? this.combined(sections) : sections.map((section) => this.section(section))}</div>
                 ${attributions.length ? html`<div class="attribution">${attributions.join(" · ")}</div>` : nothing}
             </ha-card>
         `;
@@ -168,35 +175,89 @@ export class DeparturesCard extends LitElement {
 
     private section(section: SectionConfig): TemplateResult {
         const entity = this.hass?.states[section.entity];
-        const name = section.name || (entity?.attributes?.stop_name as string | undefined) || section.entity;
-        const heading = html`
-            <button class="heading" title="${section.entity}" @click=${() => this.moreInfo(section.entity)}>
+        const direction = statedDirection(entity);
+        // A sensor that says its direction gets it as its subtitle, as an airport's two boards would otherwise read alike.
+        const subtitle = section.subtitle || (direction ? this.text(`common.${direction}`) : "");
+        const heading = this.heading(this.stopName(section), subtitle, section.entity);
+        const problem = this.problem(section.entity, false);
+        if (problem || !entity) {
+            return html`<section>${heading}${problem}</section>`;
+        }
+        return this.list(heading, [entity], shownDepartures(section.entity, entity, false), direction === "arrivals");
+    }
+
+    /**
+     * Every sensor as one list by time, each once however often it is listed. The heading names the stops it shows once
+     * each, and their direction when they all state the same one; the sections' own subtitles belong to sections. A sensor
+     * that can't be shown has a line of its own saying which and why. Rows say which way they go only when both
+     * directions are in the list.
+     */
+    private combined(sections: SectionConfig[]): TemplateResult {
+        const unique = sections.filter((section, index) => sections.findIndex((other) => other.entity === section.entity) === index);
+        const problems = unique.map((section) => this.problem(section.entity, true));
+        const shown = unique.flatMap((section, index) => {
+            const entity = this.hass?.states[section.entity];
+            return entity && !problems[index] ? [{ section, entity }] : [];
+        });
+        const entities = shown.map(({ entity }) => entity);
+        const directions = new Set(entities.map((entity) => statedDirection(entity)));
+        const [direction] = directions;
+        const subtitle = directions.size === 1 && direction ? this.text(`common.${direction}`) : "";
+        const names = [...new Set((shown.length ? shown.map(({ section }) => section) : unique).map((section) => this.stopName(section)))];
+        const heading = this.heading(names.join(", "), subtitle, (shown[0]?.section ?? unique[0]).entity);
+        const departures = shown.flatMap(({ section, entity }) => shownDepartures(section.entity, entity, true));
+        const both = new Set(departures.map((departure) => departure.direction)).size > 1;
+        if (!shown.length) {
+            return html`<section>${heading}${problems}</section>`;
+        }
+        return this.list(html`${heading}${problems}`, entities, departures, directions.size === 1 && direction === "arrivals", both);
+    }
+
+    /** A stop's name: the section's own, the sensor's, or its entity id when it has neither. */
+    private stopName(section: SectionConfig): string {
+        return section.name || (this.hass?.states[section.entity]?.attributes?.stop_name as string | undefined) || section.entity;
+    }
+
+    private heading(name: string, subtitle: string, entityId: string): TemplateResult {
+        return html`
+            <button class="heading" title="${entityId}" @click=${() => this.moreInfo(entityId)}>
                 <span class="name">${name}</span>
-                ${section.subtitle ? html`<span class="subtitle">${section.subtitle}</span>` : nothing}
+                ${subtitle ? html`<span class="subtitle">${subtitle}</span>` : nothing}
             </button>
         `;
+    }
+
+    /**
+     * What is wrong with a sensor the card can't show, or nothing when it can. In one list the heading doesn't name every
+     * sensor, so an unavailable one is named in its message, as a missing one always is.
+     */
+    private problem(entityId: string, named: boolean): TemplateResult | undefined {
+        const entity = this.hass?.states[entityId];
         if (!entity) {
-            return html`<section>
-                ${heading}
-                <div class="message">${this.text("common.no_entity", { entity: section.entity })}</div>
-            </section>`;
+            return html`<div class="message">${this.text("common.no_entity", { entity: entityId })}</div>`;
         }
         if (entity.state === "unavailable") {
-            return html`<section>
-                ${heading}
-                <div class="message">${this.text("common.unavailable")}</div>
-            </section>`;
+            const message = named ? this.text("common.entity_unavailable", { entity: entityId }) : this.text("common.unavailable");
+            return html`<div class="message">${message}</div>`;
         }
         if (!isDeparturesSensor(entity)) {
-            return html`<section>
-                ${heading}
-                <div class="message">${this.text("common.not_departures", { entity: section.entity })}</div>
-            </section>`;
+            return html`<div class="message">${this.text("common.not_departures", { entity: entityId })}</div>`;
         }
+        return undefined;
+    }
 
-        const notices = this.config?.show_notices === false ? [] : stopNotices(entity.attributes.notices);
+    /** A section's notices, its next departure large and the rest as rows. `rowIcons` marks each row's direction. */
+    private list(
+        heading: TemplateResult,
+        entities: HassEntity[],
+        departures: ShownDeparture[],
+        arrivals: boolean,
+        rowIcons = false,
+    ): TemplateResult {
+        const notices =
+            this.config?.show_notices === false ? [] : [...new Set(entities.flatMap((entity) => stopNotices(entity.attributes.notices)))];
         const { next, rest } = visibleDepartures(
-            entity.attributes.departures as Departure[],
+            departures,
             Date.now(),
             this.config?.departures ?? DEFAULT_DEPARTURES,
             this.config?.show_cancelled !== false,
@@ -215,19 +276,23 @@ export class DeparturesCard extends LitElement {
                           >
                               ${repeat(
                                   rest,
-                                  (departure) => departure.id,
-                                  (departure) => this.row(departure),
+                                  (departure) => departure.key,
+                                  (departure) => this.row(departure, rowIcons),
                               )}
                           </div>`
                         : nothing
                 }
-                ${!next && !rest.length ? html`<div class="message">${this.text("common.no_departures")}</div>` : nothing}
+                ${
+                    !next && !rest.length
+                        ? html`<div class="message">${this.text(arrivals ? "common.no_arrivals" : "common.no_departures")}</div>`
+                        : nothing
+                }
             </section>
         `;
     }
 
     /** The next departure: what, where to, and how soon, with the live time, delay and platform under it. */
-    private next(departure: Departure): TemplateResult {
+    private next(departure: ShownDeparture): TemplateResult {
         const minutes = minutesUntil(departure.estimated, Date.now());
         const delay = delayMinutes(departure);
         const countdown =
@@ -240,7 +305,7 @@ export class DeparturesCard extends LitElement {
             <div class="next">
                 ${this.badge(departure, "large")}
                 <div class="next-text">
-                    <div class="headsign">${departure.headsign ?? ""}</div>
+                    <div class="headsign">${this.directionIcon(departure)}${departure.headsign ?? ""}</div>
                     <div class="meta">
                         ${this.live(departure)}
                         ${delay !== 0 ? html`<span class="struck">${this.when(departure.scheduled)}</span>` : nothing}
@@ -254,34 +319,59 @@ export class DeparturesCard extends LitElement {
         `;
     }
 
-    /** A later departure on one line: its time, line and destination, and whatever is out of the ordinary. */
-    private row(departure: Departure): TemplateResult {
+    /**
+     * A later departure on one line: its time, line and destination, and whatever is out of the ordinary. One that has
+     * come in shows when, dimmed, and says so in its own words, as its source leaves that to the card, with its delay and
+     * any other notice.
+     */
+    private row(departure: ShownDeparture, icon: boolean): TemplateResult {
         const cancelled = !!departure.cancelled;
+        const arrived = !cancelled && !!departure.arrived;
         const delay = delayMinutes(departure);
+        let info: TemplateResult;
+        if (cancelled) {
+            info = html`<span class="alert" title="${departure.notice ?? ""}"
+                >${[this.text("common.cancelled"), departure.notice].filter(Boolean).join(", ")}</span
+            >`;
+        } else if (arrived) {
+            info = html`${this.delay(delay)}
+                <span class="arrived">${this.text(departure.mode === "plane" ? "common.landed" : "common.arrived")}</span>
+                ${departure.notice ? html`<span class="alert" title="${departure.notice}">${departure.notice}</span>` : nothing}
+                ${this.platform(departure)}`;
+        } else {
+            info = html`${this.delay(delay)}
+            ${departure.notice ? html`<span class="alert" title="${departure.notice}">${departure.notice}</span>` : nothing}
+            ${this.platform(departure)}`;
+        }
         return html`
-            <div class="row ${cancelled ? "cancelled" : ""}">
+            <div class="row ${cancelled ? "cancelled" : ""} ${arrived ? "came-in" : ""}">
                 <span class="time ${cancelled ? "struck" : ""}">${this.when(cancelled ? departure.scheduled : departure.estimated)}</span>
                 ${this.badge(departure, "small")}
-                <span class="headsign">${departure.headsign ?? ""}</span>
-                <span class="info">
-                    ${
-                        cancelled
-                            ? html`<span class="alert" title="${departure.notice ?? ""}"
-                                  >${[this.text("common.cancelled"), departure.notice].filter(Boolean).join(", ")}</span
-                              >`
-                            : html`${this.delay(delay)}
-                              ${departure.notice ? html`<span class="alert" title="${departure.notice}">${departure.notice}</span>` : nothing}
-                              ${this.platform(departure)}`
-                    }
-                </span>
+                <span class="headsign">${icon ? this.directionIcon(departure) : nothing}${departure.headsign ?? ""}</span>
+                <span class="info">${info}</span>
             </div>
         `;
     }
 
+    /** A plane's takeoff or landing in front of its destination or origin. Other modes have none yet. */
+    private directionIcon(departure: ShownDeparture): TemplateResult | typeof nothing {
+        if (departure.mode !== "plane") {
+            return nothing;
+        }
+        const arriving = departure.direction === "arrivals";
+        return html`<ha-icon
+            class="direction"
+            icon=${arriving ? "mdi:airplane-landing" : "mdi:airplane-takeoff"}
+            title=${this.text(arriving ? "common.arriving" : "common.departing")}
+        ></ha-icon>`;
+    }
+
+    /** A cancelled departure's badge is an outline in the theme's own text colour, which every theme makes readable. */
     private badge(departure: Departure, size: "large" | "small"): TemplateResult {
-        const colors = departure.cancelled
-            ? { background: "var(--disabled-text-color, #9e9e9e)", text: "#ffffff" }
-            : badgeColors(departure);
+        if (departure.cancelled) {
+            return html`<span class="badge ${size} cancelled"><span class="line">${departure.line}</span></span>`;
+        }
+        const colors = badgeColors(departure);
         return html`<span class="badge ${size}" style="background:${colors.background};color:${colors.text}"
             ><span class="line">${departure.line}</span></span
         >`;
@@ -302,14 +392,13 @@ export class DeparturesCard extends LitElement {
         >`;
     }
 
-    /** A train leaves from a track, a plane from a gate, everything else from a platform. */
-    private platform(departure: Departure): TemplateResult | typeof nothing {
+    /** A train leaves from a track, a plane from a gate and lands into a hall, everything else from a platform. */
+    private platform(departure: ShownDeparture): TemplateResult | typeof nothing {
         if (!departure.platform) {
             return nothing;
         }
-        const label = this.text(
-            departure.mode === "train" ? "common.track" : departure.mode === "plane" ? "common.gate" : "common.platform",
-        );
+        const plane = departure.direction === "arrivals" ? "common.hall" : "common.gate";
+        const label = this.text(departure.mode === "train" ? "common.track" : departure.mode === "plane" ? plane : "common.platform");
         return html`<span class="platform">${label} ${departure.platform}</span>`;
     }
 
@@ -593,8 +682,44 @@ export class DeparturesCard extends LitElement {
             }
 
             .row.cancelled .headsign,
-            .row.cancelled .time {
+            .row.cancelled .time,
+            .row.came-in .headsign,
+            .row.came-in .time {
                 color: var(--secondary-text-color);
+            }
+
+            /* A cancelled line's badge is a ring in the theme's own text colours, readable on any card, light or dark. */
+            .badge.cancelled {
+                background: none;
+                color: var(--secondary-text-color);
+                box-shadow: inset 0 0 0 2px var(--secondary-text-color);
+            }
+
+            .row.came-in .badge {
+                opacity: 0.55;
+            }
+
+            /* One that has come in is good news, not a problem, so not in a notice's red. */
+            .arrived {
+                color: var(--success-color, #2e7d32);
+                font-weight: var(--ha-font-weight-medium, 500);
+            }
+
+            /* Takeoff and landing are mirror images, so the icon is a size larger than the text around it. */
+            .direction {
+                --mdc-icon-size: 17px;
+                width: 17px;
+                height: 17px;
+                display: inline-flex;
+                vertical-align: -3px;
+                margin-right: 4px;
+                color: var(--secondary-text-color);
+            }
+
+            .next .direction {
+                --mdc-icon-size: 21px;
+                width: 21px;
+                height: 21px;
             }
 
             .struck {

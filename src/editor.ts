@@ -1,6 +1,6 @@
 /**
  * The card's visual editor: the title, the stops with their headings, how many departures each shows, cancelled ones,
- * notices and whether texts are shown in full.
+ * notices, whether texts are shown in full and whether the stops are one list.
  */
 import { LitElement, css, html, nothing } from "lit";
 import type { CSSResultGroup, TemplateResult } from "lit";
@@ -21,6 +21,7 @@ const DEFAULTS: Record<string, unknown> = {
     show_cancelled: true,
     show_notices: true,
     full_texts: false,
+    combine: false,
 };
 
 /** The title and the stops. A field inside the object selector takes its helper from `description`, as ha-form's computeHelper doesn't reach it. */
@@ -59,6 +60,7 @@ const OPTIONS_SCHEMA = [
             { name: "show_cancelled", selector: { boolean: {} } },
             { name: "show_notices", selector: { boolean: {} } },
             { name: "full_texts", selector: { boolean: {} } },
+            { name: "combine", selector: { boolean: {} } },
         ],
     },
 ];

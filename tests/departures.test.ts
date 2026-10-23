@@ -8,16 +8,31 @@ import {
     departuresSensors,
     minutesUntil,
     sectionsOf,
+    shownDepartures,
     visibleDepartures,
 } from "../src/departures";
-import type { HomeAssistant } from "../src/hass";
-import type { Departure } from "../src/types";
+import type { HassEntity, HomeAssistant } from "../src/hass";
+import type { Departure, Direction, ShownDeparture } from "../src/types";
 
 const NOW = Date.parse("2026-10-04T13:52:00Z");
 
-function departure(id: string, minutes: number, extra: Partial<Departure> = {}): Departure {
+function departure(id: string, minutes: number, extra: Partial<ShownDeparture> = {}): ShownDeparture {
     const time = new Date(NOW + minutes * 60_000).toISOString();
-    return { id, line: "55", mode: "bus", headsign: "Koskela", scheduled: time, estimated: time, ...extra };
+    return {
+        id,
+        key: id,
+        direction: "departures",
+        line: "55",
+        mode: "bus",
+        headsign: "Koskela",
+        scheduled: time,
+        estimated: time,
+        ...extra,
+    };
+}
+
+function sensor(departures: unknown[], direction?: Direction): HassEntity {
+    return { entity_id: "sensor.x", state: "", last_changed: "", attributes: { departures_version: 1, departures, direction } };
 }
 
 describe("visibleDepartures", () => {
@@ -56,11 +71,6 @@ describe("visibleDepartures", () => {
         const onlyCancelled = visibleDepartures([departure("x", 3, { cancelled: true })], NOW, 4, true);
         expect(onlyCancelled.next).toBeUndefined();
         expect(onlyCancelled.rest.map((item) => item.id)).toEqual(["x"]);
-    });
-
-    it("skips departures missing what a row needs", () => {
-        const broken = [{ id: "x", mode: "bus" }, { ...departure("y", 3), estimated: "soon" }, null] as unknown as Departure[];
-        expect(visibleDepartures([...broken, departure("ok", 4)], NOW, 4, true).next?.id).toBe("ok");
     });
 });
 
@@ -135,5 +145,25 @@ describe("sections", () => {
             },
         };
         expect(departuresSensors(hass)).toEqual(["sensor.kauppatori"]);
+    });
+});
+
+describe("shownDepartures", () => {
+    it("skips departures missing what a row needs", () => {
+        const broken = [{ id: "x", mode: "bus" }, { ...departure("y", 3), estimated: "soon" }, null] as unknown as Departure[];
+        expect(shownDepartures("sensor.x", sensor([...broken, departure("ok", 4)]), false).map((item) => item.id)).toEqual(["ok"]);
+    });
+
+    it("keys one list's departures by their sensor too, as ids are unique within a sensor only", () => {
+        const same = [departure("ay9", 5)];
+        const a = shownDepartures("sensor.a", sensor(same, "arrivals"), true);
+        const b = shownDepartures("sensor.b", sensor(same, "arrivals"), true);
+        expect(new Set([...a, ...b].map((item) => item.key)).size).toBe(2);
+        expect(shownDepartures("sensor.a", sensor(same), false).map((item) => item.key)).toEqual(["ay9"]);
+    });
+
+    it("takes the sensor's direction, and departures when it says none", () => {
+        expect(shownDepartures("sensor.a", sensor([departure("x", 5)], "arrivals"), false)[0].direction).toBe("arrivals");
+        expect(shownDepartures("sensor.a", sensor([departure("x", 5)]), false)[0].direction).toBe("departures");
     });
 });

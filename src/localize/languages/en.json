@@ -13,23 +13,34 @@
         "track": "Track",
         "platform": "Platform",
         "gate": "Gate",
-        "realtime": "Real-time estimate"
+        "realtime": "Real-time estimate",
+        "departures": "Departures",
+        "arrivals": "Arrivals",
+        "no_arrivals": "No arrivals",
+        "hall": "Hall",
+        "landed": "Landed",
+        "arrived": "Arrived",
+        "departing": "Departing",
+        "arriving": "Arriving",
+        "entity_unavailable": "{entity} isn't available right now"
     },
     "editor": {
         "title": "Title",
         "entities": "Stops",
-        "entities_helper": "Departures sensors, each shown as a section of its own. Both sides of a street fit in one card.",
+        "entities_helper": "Departures sensors, each shown as a section of its own, or all as one list. Both sides of a street fit in one card.",
         "entity": "Departures sensor",
         "name": "Name",
         "name_helper": "Replaces the stop's own name",
         "subtitle": "Subtitle",
-        "subtitle_helper": "Such as the direction, towards the centre",
-        "departures": "Departures per stop",
-        "departures_helper": "The next one large and the rest below it",
+        "subtitle_helper": "Such as the direction, towards the centre. Not used in one list.",
+        "departures": "Departures shown",
+        "departures_helper": "Per stop, or in the whole list when the stops are one list",
         "show_cancelled": "Show cancelled departures",
         "show_notices": "Show notices",
         "show_notices_helper": "Track works and other notices for the whole stop, under its name",
         "full_texts": "Show texts in full",
-        "full_texts_helper": "The subtitle and the notices of later departures wrap instead of being cut short"
+        "full_texts_helper": "The subtitle and the notices of later departures wrap instead of being cut short",
+        "combine": "Show as one list",
+        "combine_helper": "Every stop's departures and arrivals in one list in time order"
     }
 }

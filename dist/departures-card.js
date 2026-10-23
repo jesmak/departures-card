@@ -715,6 +715,8 @@ var CARD_VERSION = "1.2.0";
 var DEPARTURES_VERSION = 1;
 var DEFAULT_DEPARTURES = 4;
 var GONE_AFTER_MS = 6e4;
+var ARRIVED_KEPT_MS = 30 * 6e4;
+var ARRIVED_ROWS = 2;
 var TICK_MS = 15e3;
 var MODE_COLORS = {
   bus: "var(--departures-bus-color, #0b6aa2)",
@@ -736,13 +738,31 @@ function stopNotices(value) {
 function isDeparturesSensor(entity) {
   return entity?.attributes?.departures_version === DEPARTURES_VERSION && Array.isArray(entity.attributes.departures);
 }
+function statedDirection(entity) {
+  const direction = entity?.attributes?.direction;
+  return direction === "departures" || direction === "arrivals" ? direction : void 0;
+}
+function shownDepartures(entityId, entity, withEntity) {
+  const direction = statedDirection(entity) ?? "departures";
+  const list = Array.isArray(entity.attributes.departures) ? entity.attributes.departures : [];
+  return list.filter(isDeparture).map((departure) => ({
+    ...departure,
+    direction,
+    key: withEntity ? `${entityId}|${departure.id}` : departure.id
+  }));
+}
 function departuresSensors(hass) {
   return Object.keys(hass.states).filter((id) => isDeparturesSensor(hass.states[id])).sort();
 }
 function visibleDepartures(departures, now, count, showCancelled) {
-  const upcoming = departures.filter((departure) => isDeparture(departure) && Date.parse(departure.estimated) > now - GONE_AFTER_MS).filter((departure) => showCancelled || !departure.cancelled).sort((a3, b3) => Date.parse(a3.estimated) - Date.parse(b3.estimated));
-  const next = upcoming.find((departure) => !departure.cancelled);
-  const rest = upcoming.filter((departure) => departure !== next).slice(0, Math.max(count - (next ? 1 : 0), 0));
+  const upcoming = departures.filter(
+    (departure) => Date.parse(departure.estimated) > now - (departure.direction === "arrivals" ? ARRIVED_KEPT_MS : GONE_AFTER_MS)
+  ).filter((departure) => showCancelled || !departure.cancelled).sort((a3, b3) => Date.parse(a3.estimated) - Date.parse(b3.estimated));
+  const arrived = upcoming.filter((departure) => departure.arrived && !departure.cancelled);
+  const dropped = new Set(arrived.slice(0, Math.max(arrived.length - ARRIVED_ROWS, 0)));
+  const kept = upcoming.filter((departure) => !dropped.has(departure));
+  const next = kept.find((departure) => !departure.cancelled && !departure.arrived);
+  const rest = kept.filter((departure) => departure !== next).slice(0, Math.max(count - (next ? 1 : 0), 0));
   return { next, rest };
 }
 function isDeparture(value) {
@@ -805,24 +825,35 @@ var en_default = {
     track: "Track",
     platform: "Platform",
     gate: "Gate",
-    realtime: "Real-time estimate"
+    realtime: "Real-time estimate",
+    departures: "Departures",
+    arrivals: "Arrivals",
+    no_arrivals: "No arrivals",
+    hall: "Hall",
+    landed: "Landed",
+    arrived: "Arrived",
+    departing: "Departing",
+    arriving: "Arriving",
+    entity_unavailable: "{entity} isn't available right now"
   },
   editor: {
     title: "Title",
     entities: "Stops",
-    entities_helper: "Departures sensors, each shown as a section of its own. Both sides of a street fit in one card.",
+    entities_helper: "Departures sensors, each shown as a section of its own, or all as one list. Both sides of a street fit in one card.",
     entity: "Departures sensor",
     name: "Name",
     name_helper: "Replaces the stop's own name",
     subtitle: "Subtitle",
-    subtitle_helper: "Such as the direction, towards the centre",
-    departures: "Departures per stop",
-    departures_helper: "The next one large and the rest below it",
+    subtitle_helper: "Such as the direction, towards the centre. Not used in one list.",
+    departures: "Departures shown",
+    departures_helper: "Per stop, or in the whole list when the stops are one list",
     show_cancelled: "Show cancelled departures",
     show_notices: "Show notices",
     show_notices_helper: "Track works and other notices for the whole stop, under its name",
     full_texts: "Show texts in full",
-    full_texts_helper: "The subtitle and the notices of later departures wrap instead of being cut short"
+    full_texts_helper: "The subtitle and the notices of later departures wrap instead of being cut short",
+    combine: "Show as one list",
+    combine_helper: "Every stop's departures and arrivals in one list in time order"
   }
 };
 
@@ -842,24 +873,35 @@ var fi_default = {
     track: "Raide",
     platform: "Laituri",
     gate: "Portti",
-    realtime: "Reaaliaikainen arvio"
+    realtime: "Reaaliaikainen arvio",
+    departures: "L\xE4htev\xE4t",
+    arrivals: "Saapuvat",
+    no_arrivals: "Ei saapuvia",
+    hall: "Aula",
+    landed: "Laskeutunut",
+    arrived: "Saapunut",
+    departing: "L\xE4htev\xE4",
+    arriving: "Saapuva",
+    entity_unavailable: "{entity} ei ole juuri nyt saatavilla"
   },
   editor: {
     title: "Otsikko",
     entities: "Pys\xE4kit",
-    entities_helper: "Pys\xE4kkianturit, kukin omana osionaan. Kadun molemmat puolet mahtuvat samaan korttiin.",
+    entities_helper: "Pys\xE4kkianturit, kukin omana osionaan tai kaikki yhten\xE4 listana. Kadun molemmat puolet mahtuvat samaan korttiin.",
     entity: "Pys\xE4kkianturi",
     name: "Nimi",
     name_helper: "Korvaa pys\xE4kin oman nimen",
     subtitle: "Alaotsikko",
-    subtitle_helper: "Esimerkiksi suunta, keskustaan p\xE4in",
-    departures: "L\xE4ht\xF6j\xE4 pys\xE4kilt\xE4",
-    departures_helper: "Seuraava isona ja loput sen alla",
+    subtitle_helper: "Esimerkiksi suunta, keskustaan p\xE4in. Ei k\xE4yt\xF6ss\xE4 yhten\xE4 listana.",
+    departures: "N\xE4ytett\xE4vi\xE4 l\xE4ht\xF6j\xE4",
+    departures_helper: "Pys\xE4kki\xE4 kohden, tai koko listassa, kun pys\xE4kit ovat yhten\xE4 listana",
     show_cancelled: "N\xE4yt\xE4 perutut l\xE4hd\xF6t",
     show_notices: "N\xE4yt\xE4 tiedotteet",
     show_notices_helper: "Rataty\xF6t ja muut koko pys\xE4kki\xE4 koskevat tiedotteet sen nimen alla",
     full_texts: "N\xE4yt\xE4 tekstit kokonaan",
-    full_texts_helper: "Alaotsikko ja my\xF6hempien l\xE4ht\xF6jen tiedotteet rivitet\xE4\xE4n lyhent\xE4misen sijaan"
+    full_texts_helper: "Alaotsikko ja my\xF6hempien l\xE4ht\xF6jen tiedotteet rivitet\xE4\xE4n lyhent\xE4misen sijaan",
+    combine: "N\xE4yt\xE4 yhten\xE4 listana",
+    combine_helper: "Kaikkien pys\xE4kkien l\xE4hd\xF6t ja saapumiset yhdess\xE4 listassa aikaj\xE4rjestyksess\xE4"
   }
 };
 
@@ -892,7 +934,8 @@ var DEFAULTS = {
   departures: DEFAULT_DEPARTURES,
   show_cancelled: true,
   show_notices: true,
-  full_texts: false
+  full_texts: false,
+  combine: false
 };
 function stopsSchema(hass, text) {
   return [
@@ -927,7 +970,8 @@ var OPTIONS_SCHEMA = [
       { name: "departures", selector: { number: { min: 1, max: 20, step: 1, mode: "box" } } },
       { name: "show_cancelled", selector: { boolean: {} } },
       { name: "show_notices", selector: { boolean: {} } },
-      { name: "full_texts", selector: { boolean: {} } }
+      { name: "full_texts", selector: { boolean: {} } },
+      { name: "combine", selector: { boolean: {} } }
     ]
   }
 ];
@@ -1056,8 +1100,12 @@ var DeparturesCard = class extends i4 {
     }
     this.config = { ...config, entities };
   }
+  /** One list only from two different sensors or more: one sensor given twice has nothing to merge. */
+  get combines() {
+    return !!this.config?.combine && new Set(sectionsOf(this.config.entities).map((section) => section.entity)).size > 1;
+  }
   getCardSize() {
-    const sections = this.config ? sectionsOf(this.config.entities).length : 1;
+    const sections = this.config && !this.combines ? sectionsOf(this.config.entities).length : 1;
     return 1 + sections * (2 + (this.config?.departures ?? DEFAULT_DEPARTURES));
   }
   /** In a sections view the card takes a whole section by default and is never narrower than half of one. */
@@ -1125,41 +1173,83 @@ var DeparturesCard = class extends i4 {
     return b2`
             <ha-card class=${this.config.full_texts ? "full" : ""}>
                 ${this.config.title ? b2`<h1 class="card-title">${this.config.title}</h1>` : A}
-                <div class="sections">${sections.map((section) => this.section(section))}</div>
+                <div class="sections">${this.combines ? this.combined(sections) : sections.map((section) => this.section(section))}</div>
                 ${attributions.length ? b2`<div class="attribution">${attributions.join(" \xB7 ")}</div>` : A}
             </ha-card>
         `;
   }
   section(section) {
     const entity = this.hass?.states[section.entity];
-    const name = section.name || entity?.attributes?.stop_name || section.entity;
-    const heading = b2`
-            <button class="heading" title="${section.entity}" @click=${() => this.moreInfo(section.entity)}>
+    const direction = statedDirection(entity);
+    const subtitle = section.subtitle || (direction ? this.text(`common.${direction}`) : "");
+    const heading = this.heading(this.stopName(section), subtitle, section.entity);
+    const problem = this.problem(section.entity, false);
+    if (problem || !entity) {
+      return b2`<section>${heading}${problem}</section>`;
+    }
+    return this.list(heading, [entity], shownDepartures(section.entity, entity, false), direction === "arrivals");
+  }
+  /**
+   * Every sensor as one list by time, each once however often it is listed. The heading names the stops it shows once
+   * each, and their direction when they all state the same one; the sections' own subtitles belong to sections. A sensor
+   * that can't be shown has a line of its own saying which and why. Rows say which way they go only when both
+   * directions are in the list.
+   */
+  combined(sections) {
+    const unique = sections.filter((section, index) => sections.findIndex((other) => other.entity === section.entity) === index);
+    const problems = unique.map((section) => this.problem(section.entity, true));
+    const shown = unique.flatMap((section, index) => {
+      const entity = this.hass?.states[section.entity];
+      return entity && !problems[index] ? [{ section, entity }] : [];
+    });
+    const entities = shown.map(({ entity }) => entity);
+    const directions = new Set(entities.map((entity) => statedDirection(entity)));
+    const [direction] = directions;
+    const subtitle = directions.size === 1 && direction ? this.text(`common.${direction}`) : "";
+    const names = [...new Set((shown.length ? shown.map(({ section }) => section) : unique).map((section) => this.stopName(section)))];
+    const heading = this.heading(names.join(", "), subtitle, (shown[0]?.section ?? unique[0]).entity);
+    const departures = shown.flatMap(({ section, entity }) => shownDepartures(section.entity, entity, true));
+    const both = new Set(departures.map((departure) => departure.direction)).size > 1;
+    if (!shown.length) {
+      return b2`<section>${heading}${problems}</section>`;
+    }
+    return this.list(b2`${heading}${problems}`, entities, departures, directions.size === 1 && direction === "arrivals", both);
+  }
+  /** A stop's name: the section's own, the sensor's, or its entity id when it has neither. */
+  stopName(section) {
+    return section.name || this.hass?.states[section.entity]?.attributes?.stop_name || section.entity;
+  }
+  heading(name, subtitle, entityId) {
+    return b2`
+            <button class="heading" title="${entityId}" @click=${() => this.moreInfo(entityId)}>
                 <span class="name">${name}</span>
-                ${section.subtitle ? b2`<span class="subtitle">${section.subtitle}</span>` : A}
+                ${subtitle ? b2`<span class="subtitle">${subtitle}</span>` : A}
             </button>
         `;
+  }
+  /**
+   * What is wrong with a sensor the card can't show, or nothing when it can. In one list the heading doesn't name every
+   * sensor, so an unavailable one is named in its message, as a missing one always is.
+   */
+  problem(entityId, named) {
+    const entity = this.hass?.states[entityId];
     if (!entity) {
-      return b2`<section>
-                ${heading}
-                <div class="message">${this.text("common.no_entity", { entity: section.entity })}</div>
-            </section>`;
+      return b2`<div class="message">${this.text("common.no_entity", { entity: entityId })}</div>`;
     }
     if (entity.state === "unavailable") {
-      return b2`<section>
-                ${heading}
-                <div class="message">${this.text("common.unavailable")}</div>
-            </section>`;
+      const message = named ? this.text("common.entity_unavailable", { entity: entityId }) : this.text("common.unavailable");
+      return b2`<div class="message">${message}</div>`;
     }
     if (!isDeparturesSensor(entity)) {
-      return b2`<section>
-                ${heading}
-                <div class="message">${this.text("common.not_departures", { entity: section.entity })}</div>
-            </section>`;
+      return b2`<div class="message">${this.text("common.not_departures", { entity: entityId })}</div>`;
     }
-    const notices = this.config?.show_notices === false ? [] : stopNotices(entity.attributes.notices);
+    return void 0;
+  }
+  /** A section's notices, its next departure large and the rest as rows. `rowIcons` marks each row's direction. */
+  list(heading, entities, departures, arrivals, rowIcons = false) {
+    const notices = this.config?.show_notices === false ? [] : [...new Set(entities.flatMap((entity) => stopNotices(entity.attributes.notices)))];
     const { next, rest } = visibleDepartures(
-      entity.attributes.departures,
+      departures,
       Date.now(),
       this.config?.departures ?? DEFAULT_DEPARTURES,
       this.config?.show_cancelled !== false
@@ -1176,11 +1266,11 @@ var DeparturesCard = class extends i4 {
                           >
                               ${c4(
       rest,
-      (departure) => departure.id,
-      (departure) => this.row(departure)
+      (departure) => departure.key,
+      (departure) => this.row(departure, rowIcons)
     )}
                           </div>` : A}
-                ${!next && !rest.length ? b2`<div class="message">${this.text("common.no_departures")}</div>` : A}
+                ${!next && !rest.length ? b2`<div class="message">${this.text(arrivals ? "common.no_arrivals" : "common.no_departures")}</div>` : A}
             </section>
         `;
   }
@@ -1193,7 +1283,7 @@ var DeparturesCard = class extends i4 {
             <div class="next">
                 ${this.badge(departure, "large")}
                 <div class="next-text">
-                    <div class="headsign">${departure.headsign ?? ""}</div>
+                    <div class="headsign">${this.directionIcon(departure)}${departure.headsign ?? ""}</div>
                     <div class="meta">
                         ${this.live(departure)}
                         ${delay !== 0 ? b2`<span class="struck">${this.when(departure.scheduled)}</span>` : A}
@@ -1206,27 +1296,57 @@ var DeparturesCard = class extends i4 {
             </div>
         `;
   }
-  /** A later departure on one line: its time, line and destination, and whatever is out of the ordinary. */
-  row(departure) {
+  /**
+   * A later departure on one line: its time, line and destination, and whatever is out of the ordinary. One that has
+   * come in shows when, dimmed, and says so in its own words, as its source leaves that to the card, with its delay and
+   * any other notice.
+   */
+  row(departure, icon) {
     const cancelled = !!departure.cancelled;
+    const arrived = !cancelled && !!departure.arrived;
     const delay = delayMinutes(departure);
+    let info;
+    if (cancelled) {
+      info = b2`<span class="alert" title="${departure.notice ?? ""}"
+                >${[this.text("common.cancelled"), departure.notice].filter(Boolean).join(", ")}</span
+            >`;
+    } else if (arrived) {
+      info = b2`${this.delay(delay)}
+                <span class="arrived">${this.text(departure.mode === "plane" ? "common.landed" : "common.arrived")}</span>
+                ${departure.notice ? b2`<span class="alert" title="${departure.notice}">${departure.notice}</span>` : A}
+                ${this.platform(departure)}`;
+    } else {
+      info = b2`${this.delay(delay)}
+            ${departure.notice ? b2`<span class="alert" title="${departure.notice}">${departure.notice}</span>` : A}
+            ${this.platform(departure)}`;
+    }
     return b2`
-            <div class="row ${cancelled ? "cancelled" : ""}">
+            <div class="row ${cancelled ? "cancelled" : ""} ${arrived ? "came-in" : ""}">
                 <span class="time ${cancelled ? "struck" : ""}">${this.when(cancelled ? departure.scheduled : departure.estimated)}</span>
                 ${this.badge(departure, "small")}
-                <span class="headsign">${departure.headsign ?? ""}</span>
-                <span class="info">
-                    ${cancelled ? b2`<span class="alert" title="${departure.notice ?? ""}"
-                                  >${[this.text("common.cancelled"), departure.notice].filter(Boolean).join(", ")}</span
-                              >` : b2`${this.delay(delay)}
-                              ${departure.notice ? b2`<span class="alert" title="${departure.notice}">${departure.notice}</span>` : A}
-                              ${this.platform(departure)}`}
-                </span>
+                <span class="headsign">${icon ? this.directionIcon(departure) : A}${departure.headsign ?? ""}</span>
+                <span class="info">${info}</span>
             </div>
         `;
   }
+  /** A plane's takeoff or landing in front of its destination or origin. Other modes have none yet. */
+  directionIcon(departure) {
+    if (departure.mode !== "plane") {
+      return A;
+    }
+    const arriving = departure.direction === "arrivals";
+    return b2`<ha-icon
+            class="direction"
+            icon=${arriving ? "mdi:airplane-landing" : "mdi:airplane-takeoff"}
+            title=${this.text(arriving ? "common.arriving" : "common.departing")}
+        ></ha-icon>`;
+  }
+  /** A cancelled departure's badge is an outline in the theme's own text colour, which every theme makes readable. */
   badge(departure, size) {
-    const colors = departure.cancelled ? { background: "var(--disabled-text-color, #9e9e9e)", text: "#ffffff" } : badgeColors(departure);
+    if (departure.cancelled) {
+      return b2`<span class="badge ${size} cancelled"><span class="line">${departure.line}</span></span>`;
+    }
+    const colors = badgeColors(departure);
     return b2`<span class="badge ${size}" style="background:${colors.background};color:${colors.text}"
             ><span class="line">${departure.line}</span></span
         >`;
@@ -1242,14 +1362,13 @@ var DeparturesCard = class extends i4 {
             >${minutes > 0 ? "+" : "\u2212"}${Math.abs(minutes)} ${this.text("common.min")}</span
         >`;
   }
-  /** A train leaves from a track, a plane from a gate, everything else from a platform. */
+  /** A train leaves from a track, a plane from a gate and lands into a hall, everything else from a platform. */
   platform(departure) {
     if (!departure.platform) {
       return A;
     }
-    const label = this.text(
-      departure.mode === "train" ? "common.track" : departure.mode === "plane" ? "common.gate" : "common.platform"
-    );
+    const plane = departure.direction === "arrivals" ? "common.hall" : "common.gate";
+    const label = this.text(departure.mode === "train" ? "common.track" : departure.mode === "plane" ? plane : "common.platform");
     return b2`<span class="platform">${label} ${departure.platform}</span>`;
   }
   /** A clock time, with its day in front when it isn't today: "ma 06.15". */
@@ -1526,8 +1645,44 @@ var DeparturesCard = class extends i4 {
             }
 
             .row.cancelled .headsign,
-            .row.cancelled .time {
+            .row.cancelled .time,
+            .row.came-in .headsign,
+            .row.came-in .time {
                 color: var(--secondary-text-color);
+            }
+
+            /* A cancelled line's badge is a ring in the theme's own text colours, readable on any card, light or dark. */
+            .badge.cancelled {
+                background: none;
+                color: var(--secondary-text-color);
+                box-shadow: inset 0 0 0 2px var(--secondary-text-color);
+            }
+
+            .row.came-in .badge {
+                opacity: 0.55;
+            }
+
+            /* One that has come in is good news, not a problem, so not in a notice's red. */
+            .arrived {
+                color: var(--success-color, #2e7d32);
+                font-weight: var(--ha-font-weight-medium, 500);
+            }
+
+            /* Takeoff and landing are mirror images, so the icon is a size larger than the text around it. */
+            .direction {
+                --mdc-icon-size: 17px;
+                width: 17px;
+                height: 17px;
+                display: inline-flex;
+                vertical-align: -3px;
+                margin-right: 4px;
+                color: var(--secondary-text-color);
+            }
+
+            .next .direction {
+                --mdc-icon-size: 21px;
+                width: 21px;
+                height: 21px;
             }
 
             .struck {

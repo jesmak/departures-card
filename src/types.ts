@@ -22,7 +22,12 @@ export interface DeparturesCardConfig extends LovelaceCardConfig {
     show_notices?: boolean;
     /** The subtitle and the notices in the rows wrap in full instead of being cut short. */
     full_texts?: boolean;
+    /** All the sensors as one list by time instead of a section each, such as an airport's departures and arrivals. */
+    combine?: boolean;
 }
+
+/** Which way a sensor's list goes. A sensor that doesn't say is departures. */
+export type Direction = "departures" | "arrivals";
 
 /** One departure, as docs/departures-format.md describes it. */
 export interface Departure {
@@ -36,6 +41,14 @@ export interface Departure {
     delay?: number | null;
     platform?: string | null;
     cancelled?: boolean | null;
+    /** An arrival that has come in. */
+    arrived?: boolean | null;
     notice?: string | null;
     color?: string | null;
+}
+
+/** A departure as the card shows it: with the direction of the sensor it came from, and a key unique in the card. */
+export interface ShownDeparture extends Departure {
+    direction: Direction;
+    key: string;
 }

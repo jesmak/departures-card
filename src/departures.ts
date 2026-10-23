@@ -1,7 +1,7 @@
 /** Reading departures sensors, and the times and colours the card shows for them. */
-import { DEPARTURES_VERSION, GONE_AFTER_MS, MODE_COLORS } from "./const";
+import { ARRIVED_KEPT_MS, ARRIVED_ROWS, DEPARTURES_VERSION, GONE_AFTER_MS, MODE_COLORS } from "./const";
 import type { HassEntity, HomeAssistant } from "./hass";
-import type { Departure, SectionConfig } from "./types";
+import type { Departure, Direction, SectionConfig, ShownDeparture } from "./types";
 
 /** The card's `entities` as sections, whether each was written as an entity id or with its heading. */
 export function sectionsOf(entities: Array<string | SectionConfig> | undefined): SectionConfig[] {
@@ -20,6 +20,26 @@ export function isDeparturesSensor(entity: HassEntity | undefined): boolean {
     return entity?.attributes?.departures_version === DEPARTURES_VERSION && Array.isArray(entity.attributes.departures);
 }
 
+/** The direction a sensor says it has, or none when it doesn't say, as other sources' departures. */
+export function statedDirection(entity: HassEntity | undefined): Direction | undefined {
+    const direction = entity?.attributes?.direction;
+    return direction === "departures" || direction === "arrivals" ? direction : undefined;
+}
+
+/**
+ * A sensor's departures as the card shows them, keyed by the sensor as well when `withEntity` is set: ids are unique within a
+ * sensor only, and the same flight number lands at two airports on the same day.
+ */
+export function shownDepartures(entityId: string, entity: HassEntity, withEntity: boolean): ShownDeparture[] {
+    const direction = statedDirection(entity) ?? "departures";
+    const list = Array.isArray(entity.attributes.departures) ? (entity.attributes.departures as unknown[]) : [];
+    return list.filter(isDeparture).map((departure) => ({
+        ...departure,
+        direction,
+        key: withEntity ? `${entityId}|${departure.id}` : departure.id,
+    }));
+}
+
 /** The sensors that write the departures format, for the card picker and the editor. */
 export function departuresSensors(hass: HomeAssistant): string[] {
     return Object.keys(hass.states)
@@ -28,23 +48,30 @@ export function departuresSensors(hass: HomeAssistant): string[] {
 }
 
 /**
- * What a section shows: the next departure that isn't cancelled, large, and the ones after it.
+ * What a section shows: the next departure that isn't cancelled or in already, large, and the ones after it.
  *
- * Departures more than a minute gone are dropped. A cancelled departure is never the large one, but stays in the rows, in its
- * place by time, unless cancelled ones are hidden. `count` covers both, the large one included.
+ * Departures more than a minute gone are dropped, and arrivals half an hour after their time. Of those that have come
+ * in, only the latest two stay. A cancelled departure or one that has come in
+ * is never the large one, but stays in the rows, in its place by time, unless cancelled ones are hidden. `count` covers
+ * all of them, the large one included.
  */
 export function visibleDepartures(
-    departures: Departure[],
+    departures: ShownDeparture[],
     now: number,
     count: number,
     showCancelled: boolean,
-): { next?: Departure; rest: Departure[] } {
+): { next?: ShownDeparture; rest: ShownDeparture[] } {
     const upcoming = departures
-        .filter((departure) => isDeparture(departure) && Date.parse(departure.estimated) > now - GONE_AFTER_MS)
+        .filter(
+            (departure) => Date.parse(departure.estimated) > now - (departure.direction === "arrivals" ? ARRIVED_KEPT_MS : GONE_AFTER_MS),
+        )
         .filter((departure) => showCancelled || !departure.cancelled)
         .sort((a, b) => Date.parse(a.estimated) - Date.parse(b.estimated));
-    const next = upcoming.find((departure) => !departure.cancelled);
-    const rest = upcoming.filter((departure) => departure !== next).slice(0, Math.max(count - (next ? 1 : 0), 0));
+    const arrived = upcoming.filter((departure) => departure.arrived && !departure.cancelled);
+    const dropped = new Set(arrived.slice(0, Math.max(arrived.length - ARRIVED_ROWS, 0)));
+    const kept = upcoming.filter((departure) => !dropped.has(departure));
+    const next = kept.find((departure) => !departure.cancelled && !departure.arrived);
+    const rest = kept.filter((departure) => departure !== next).slice(0, Math.max(count - (next ? 1 : 0), 0));
     return { next, rest };
 }
 

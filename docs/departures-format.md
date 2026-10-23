@@ -1,7 +1,8 @@
 # Departures format, version 1
 
 A departures sensor is a Home Assistant entity that lists the next departures from one stop or station, such as
-buses from a bus stop, trains from a railway station, trams, ferries, or flights from an airport. The
+buses from a bus stop, trains from a railway station, trams, ferries, or flights from an airport. It can list arrivals
+instead, such as the flights landing at an airport. The
 [departures card](../README.md) shows any entity in this format. Anything can produce one, an integration or a
 template entity.
 
@@ -13,6 +14,7 @@ The keywords **MUST**, **SHOULD** and **MAY** are used as described in
 - [Overview](#overview)
 - [Entity](#entity)
 - [Departures](#departures)
+- [Arrivals](#arrivals)
 - [Rules for sources](#rules-for-sources)
 - [Examples](#examples)
 - [Versioning](#versioning)
@@ -54,6 +56,7 @@ that changes on its own, such as "in 4 min".
 | `departures_version` | integer  | **MUST** | `1`. The card uses this to recognise a departures sensor.                                                                                                                                 |
 | `departures`         | object[] | **MUST** | The departures, in order of `estimated`. See [departures](#departures). An empty list when nothing is leaving.                                                                            |
 | `stop_name`          | string   | **MUST** | The stop's or station's name: `Kauppatori`, `Tampere`.                                                                                                                                    |
+| `direction`          | string   | MAY      | `departures` or `arrivals`. Missing means departures. An arrivals sensor's `departures` list holds arrivals, with `headsign` where each comes from. See [arrivals](#arrivals).            |
 | `stop_id`            | string   | MAY      | The source's own identifier for the stop: `HSL:1020201`, `TPE`.                                                                                                                           |
 | `stop_code`          | string   | MAY      | The code shown at the stop itself, where there is one: `H0453`.                                                                                                                           |
 | `attribution`        | string   | SHOULD   | Data credit, shown under the departures. Required when the data licence asks for credit.                                                                                                  |
@@ -74,6 +77,7 @@ that changes on its own, such as "in 4 min".
 | `delay`     | integer  | MAY      | Seconds behind the timetable; negative means early. Missing means 0. The card shows the delay in the minutes its clock times show, worked out from `scheduled` and `estimated`, so the two never disagree. |
 | `platform`  | string   | MAY      | Track, platform or gate, such as `3`, `B` or `28`.                                                                                                                                                         |
 | `cancelled` | boolean  | MAY      | The departure is cancelled. Missing means `false`.                                                                                                                                                         |
+| `arrived`   | boolean  | MAY      | An arrival has come in. Its `estimated` is then when it did, as near as the source knows. Missing means `false`. Only for an arrivals sensor.                                                              |
 | `notice`    | string   | MAY      | A short notice in the language the source was configured for, such as the reason for a cancellation: `Rolling stock`.                                                                                      |
 | `color`     | string   | MAY      | The line's own colour as a CSS hex colour, `#00985f`. Replaces the mode's default colour. The card picks a readable text colour for it.                                                                    |
 
@@ -89,6 +93,18 @@ whose `estimated` time is more than a minute in the past is hidden, so a sensor 
 show a bus that has already gone. Cancelled departures stay in the list unless the card is set to hide them. The stop's `notices` are shown in full under
 its name, and a departure's `notice` in full on the next departure and cut short on the rows below.
 
+## Arrivals
+
+A sensor with `direction: "arrivals"` lists what is coming in rather than what is leaving, in the same shape. `headsign`
+is where each comes from, `scheduled` and `estimated` its arrival times, `platform` where to meet it, such as a baggage
+hall. A sensor that lists both directions is two sensors, one each, so no other source has to say a direction.
+
+The card shows an arrival until half an hour past its `estimated` time, rather than the minute it gives a departure, so
+someone meeting it still sees it after it has come in. One with `arrived: true` shows when it came in, dimmed, with its
+delay and notice, and the card says it has arrived in its own words. Only the latest two that have come in are listed.
+The large one is the next arrival that hasn't. The card names a sensor's
+direction under its name when the sensor says one, and in a list of both directions marks each row with it.
+
 ## Rules for sources
 
 - Integrations **MUST** list `departures` in `_unrecorded_attributes`, so only the next departure time reaches the
@@ -100,6 +116,9 @@ its name, and a departure's `notice` in full on the next departure and cut short
 - Sources **SHOULD** list in `notices` only what is in force now, and leave the field out when there is nothing.
 - Sources **SHOULD** keep cancelled departures in the list with `cancelled: true` instead of dropping them, so
   someone waiting knows not to.
+- Arrivals sources **SHOULD** set `arrived` once an arrival has come in, and give its actual time of arrival as
+  `estimated` when they have one, rather than an estimate made before it. They **SHOULD** keep an arrival for half an hour after it has come in, as the card
+  does, and **SHOULD NOT** give it a `notice` that only says it has arrived.
 - Sources **SHOULD NOT** give a cancelled departure a `notice` that only says it is cancelled. The card says it in its
   own language, so a notice of `Cancelled` would read "Cancelled, Cancelled". Give the reason, or leave the notice out.
 - Sources **SHOULD** let the user choose how many departures to list. The card shows at most as many as the
@@ -196,4 +215,5 @@ The state is IC 45's estimated time, because S 172 is cancelled.
 ## Versioning
 
 `departures_version` changes only for breaking changes. New optional fields are added to version 1 without
-changing it, and the card ignores fields it doesn't know.
+changing it, and the card ignores fields it doesn't know. `direction` and `arrived` were added that way, so a card
+before 1.2.0 shows an arrivals sensor as departures.
