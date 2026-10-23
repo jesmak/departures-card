@@ -88,7 +88,7 @@ describe("departures-card", () => {
         // drawn the slot the content sits in, which happens after the card's own update. The layout width is fractional
         // (the computed width), offsetWidth rounds it, and the drawn width (getBoundingClientRect) is scaled, as in a
         // dialog opening. A badge that isn't drawn has the computed width auto.
-        const WIDTHS: Record<string, number> = { AY1411: 83, AY957: 50.22, SK1709: 58.08, "16": 30, "55": 30, "550": 38 };
+        const WIDTHS: Record<string, number> = { AY9411: 83, AY907: 50.22, SK9709: 58.08, "16": 30, "55": 30, "550": 38 };
         let widths: Record<string, number>;
         let drawn: boolean;
         let scale: number;
@@ -157,12 +157,12 @@ describe("departures-card", () => {
         };
         const badgeWidths = (root: ShadowRoot) =>
             [...root.querySelectorAll<HTMLElement>(".rows")].map((rows) => rows.style.getPropertyValue("--badge-width"));
-        const flights = () => hass({ "sensor.kauppatori": [departure("a", 5, { line: "AY1411" }), departure("b", 6, { line: "SK1709" })] });
+        const flights = () => hass({ "sensor.kauppatori": [departure("a", 5, { line: "AY9411" }), departure("b", 6, { line: "SK9709" })] });
 
         it.each([
             [
                 "the widest row badge, rounded up so they are all exactly as wide",
-                { "sensor.kauppatori": ["AY1411", "AY957", "SK1709"] },
+                { "sensor.kauppatori": ["AY9411", "AY907", "SK9709"] },
                 1,
                 ["59px"],
             ],
@@ -170,13 +170,13 @@ describe("departures-card", () => {
             ["only the stops that have rows", { "sensor.kauppatori": [], "sensor.b": ["55", "550"] }, 1, ["38px"]],
             [
                 "not a stop's next departure, even when it is the only one",
-                { "sensor.kauppatori": ["AY1411"], "sensor.b": ["55", "550"] },
+                { "sensor.kauppatori": ["AY9411"], "sensor.b": ["55", "550"] },
                 1,
                 ["38px"],
             ],
             [
                 "its layout width when it is drawn scaled, as in a dialog opening",
-                { "sensor.kauppatori": ["AY1411", "SK1709"] },
+                { "sensor.kauppatori": ["AY9411", "SK9709"] },
                 0.8,
                 ["59px"],
             ],
@@ -199,7 +199,7 @@ describe("departures-card", () => {
         it("measures again from scratch on a render, so a stop's badges can also get narrower", async () => {
             const element = await card(flights(), {});
             await haCardDraws();
-            widths.SK1709 = 40;
+            widths.SK9709 = 40;
             element.requestUpdate();
             await element.updateComplete;
             await nextFrame();
@@ -210,7 +210,7 @@ describe("departures-card", () => {
             const element = await card(flights(), {});
             await haCardDraws();
             // A line that wraps at its spaces gets narrower when the card does.
-            widths.SK1709 = 40;
+            widths.SK9709 = 40;
             resize();
             await nextFrame();
             expect(badgeWidths(element.shadowRoot!)).toEqual(["40px"]);
@@ -256,7 +256,7 @@ describe("departures-card", () => {
             element.requestUpdate();
             await element.updateComplete;
             element.remove();
-            widths.SK1709 = 40;
+            widths.SK9709 = 40;
             await nextFrame();
             expect(badgeWidths(element.shadowRoot!)).toEqual(["59px"]);
         });

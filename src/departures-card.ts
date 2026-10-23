@@ -124,7 +124,7 @@ export class DeparturesCard extends LitElement {
 
     /**
      * A stop's later departures get badges as wide as its widest, so their destinations line up, as line names such as
-     * AY957 and SK1709 differ in width. Measured after every render and every change in the card's size, on the next
+     * AY907 and SK9709 differ in width. Measured after every render and every change in the card's size, on the next
      * frame and once however often it is asked. ha-card draws the slot the content sits in only after this card's
      * update, and until then nothing in it has a size. Measured afresh each time, so the badges can also get narrower.
      * A hidden card measures nothing and drops its widths, and measures again when it is shown, as its size changes.
