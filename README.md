@@ -99,6 +99,9 @@ Everything can be set in the card's visual editor.
 <img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-light.png#gh-light-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice in full, and the rows below with the same notice on its own line under the departure it concerns">
 <img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-dark.png#gh-dark-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice in full, and the rows below with the same notice on its own line under the departure it concerns">
 
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/airport-light.png#gh-light-mode-only" width="510" alt="An airport's departures and arrivals as one list, each flight with a takeoff or landing icon, the next departure large, two landed flights dimmed with their halls, and a cancelled flight with an outlined badge">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/airport-dark.png#gh-dark-mode-only" width="510" alt="An airport's departures and arrivals as one list, each flight with a takeoff or landing icon, the next departure large, two landed flights dimmed with their halls, and a cancelled flight with an outlined badge">
+
 Clicking a stop's name opens its sensor. With `combine` the heading names every stop it shows once, with their direction
 when they all have the same one, and opens the first of them. A stop that can't be shown has a line of its own saying
 why.

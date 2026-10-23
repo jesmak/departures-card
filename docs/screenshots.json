@@ -165,6 +165,121 @@
                     }
                 ]
             }
+        },
+        "sensor.helsinki": {
+            "state": "2026-10-14T07:45:00+03:00",
+            "attributes": {
+                "friendly_name": "Helsinki",
+                "device_class": "timestamp",
+                "departures_version": 1,
+                "direction": "departures",
+                "stop_id": "HEL",
+                "stop_name": "Helsinki",
+                "attribution": "Finavia",
+                "departures": [
+                    {
+                        "id": "flight:2026-10-14/AY9301",
+                        "line": "AY9301",
+                        "mode": "plane",
+                        "headsign": "Stockholm",
+                        "scheduled": "2026-10-14T07:45:00+03:00",
+                        "estimated": "2026-10-14T07:45:00+03:00",
+                        "platform": "23",
+                        "notice": "Final call"
+                    },
+                    {
+                        "id": "flight:2026-10-14/AY9305",
+                        "line": "AY9305",
+                        "mode": "plane",
+                        "headsign": "Oulu",
+                        "scheduled": "2026-10-14T07:55:00+03:00",
+                        "estimated": "2026-10-14T08:10:00+03:00",
+                        "realtime": true,
+                        "delay": 900,
+                        "platform": "12",
+                        "notice": "Go to gate"
+                    },
+                    {
+                        "id": "flight:2026-10-14/AY9311",
+                        "line": "AY9311",
+                        "mode": "plane",
+                        "headsign": "Copenhagen",
+                        "scheduled": "2026-10-14T08:05:00+03:00",
+                        "estimated": "2026-10-14T08:05:00+03:00",
+                        "cancelled": true
+                    },
+                    {
+                        "id": "flight:2026-10-14/AY9321",
+                        "line": "AY9321",
+                        "mode": "plane",
+                        "headsign": "Tallinn",
+                        "scheduled": "2026-10-14T08:20:00+03:00",
+                        "estimated": "2026-10-14T08:20:00+03:00",
+                        "platform": "31B"
+                    }
+                ]
+            }
+        },
+        "sensor.helsinki_arrivals": {
+            "state": "2026-10-14T07:48:00+03:00",
+            "attributes": {
+                "friendly_name": "Helsinki arrivals",
+                "device_class": "timestamp",
+                "departures_version": 1,
+                "direction": "arrivals",
+                "stop_id": "HEL",
+                "stop_name": "Helsinki",
+                "attribution": "Finavia",
+                "departures": [
+                    {
+                        "id": "arrival:2026-10-14/AY9302",
+                        "line": "AY9302",
+                        "mode": "plane",
+                        "headsign": "Oulu",
+                        "scheduled": "2026-10-14T07:20:00+03:00",
+                        "estimated": "2026-10-14T07:14:00+03:00",
+                        "realtime": true,
+                        "delay": -360,
+                        "platform": "2A",
+                        "arrived": true
+                    },
+                    {
+                        "id": "arrival:2026-10-14/AY9304",
+                        "line": "AY9304",
+                        "mode": "plane",
+                        "headsign": "London Heathrow",
+                        "scheduled": "2026-10-14T07:35:00+03:00",
+                        "estimated": "2026-10-14T07:31:00+03:00",
+                        "realtime": true,
+                        "delay": -240,
+                        "platform": "2B",
+                        "arrived": true
+                    },
+                    {
+                        "id": "arrival:2026-10-14/AY9306",
+                        "line": "AY9306",
+                        "mode": "plane",
+                        "headsign": "Ivalo, Kittilä",
+                        "scheduled": "2026-10-14T07:50:00+03:00",
+                        "estimated": "2026-10-14T07:48:00+03:00",
+                        "realtime": true,
+                        "delay": -120,
+                        "platform": "2A",
+                        "notice": "Approaching"
+                    },
+                    {
+                        "id": "arrival:2026-10-14/AY9308",
+                        "line": "AY9308",
+                        "mode": "plane",
+                        "headsign": "Amsterdam",
+                        "scheduled": "2026-10-14T08:00:00+03:00",
+                        "estimated": "2026-10-14T08:15:00+03:00",
+                        "realtime": true,
+                        "delay": 900,
+                        "platform": "2B"
+                    }
+                ]
+            }
         }
     },
     "shots": [
@@ -212,6 +327,16 @@
             "card": {
                 "type": "custom:departures-card",
                 "entities": ["sensor.hameenkatu_tke0002"]
+            }
+        },
+        {
+            "name": "airport",
+            "width": 500,
+            "card": {
+                "type": "custom:departures-card",
+                "combine": true,
+                "departures": 8,
+                "entities": ["sensor.helsinki", "sensor.helsinki_arrivals"]
             }
         }
     ]
