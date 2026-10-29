@@ -4,6 +4,7 @@
         "description": "The next departures from stops, railway stations and airports",
         "invalid_configuration": "Invalid configuration. Add at least one departures sensor.",
         "invalid_departures": "Invalid configuration. The number of departures must be a whole number, at least 1.",
+        "invalid_height": "Invalid height. height and max_height must be positive numbers of pixels, and height_mode auto, fixed or max.",
         "no_entity": "Entity {entity} not found",
         "not_departures": "{entity} is not a departures sensor",
         "unavailable": "Departures are not available right now",
@@ -42,6 +43,15 @@
         "full_texts": "Show texts in full",
         "full_texts_helper": "The subtitle and the notices of later departures wrap instead of being cut short",
         "combine": "Show as one list",
-        "combine_helper": "Every stop's departures and arrivals in one list in time order"
+        "combine_helper": "Every stop's departures and arrivals in one list in time order",
+        "height_mode": "Height",
+        "height_mode_helper": "A height set in the layout tab of a sections view is used instead.",
+        "height_mode_auto": "Fits the content",
+        "height_mode_fixed": "Fixed",
+        "height_mode_max": "Grows up to a limit",
+        "height": "Fixed height",
+        "height_helper": "The card is always this tall, and the departures scroll inside it.",
+        "max_height": "Maximum height",
+        "max_height_helper": "The card grows with its content up to this height, and then the departures scroll."
     }
 }

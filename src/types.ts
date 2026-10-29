@@ -1,4 +1,5 @@
 import type { LovelaceCardConfig } from "./hass";
+import type { HeightConfig } from "./height";
 
 /** One section of the card: a departures sensor, and how its heading reads. */
 export interface SectionConfig {
@@ -9,7 +10,7 @@ export interface SectionConfig {
     subtitle?: string;
 }
 
-export interface DeparturesCardConfig extends LovelaceCardConfig {
+export interface DeparturesCardConfig extends LovelaceCardConfig, HeightConfig {
     /** Departures sensors, each a section of its own: an entity id, or one with its heading. */
     entities: Array<string | SectionConfig>;
     /** Shown at the top of the card. */

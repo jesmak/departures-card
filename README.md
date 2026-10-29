@@ -53,16 +53,19 @@ you make one, give its repository the topic too. A template entity can write the
 
 ## Options
 
-| Name             | Type    | Default  | Description                                                                                                                                                                          |
-| ---------------- | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `type`           | string  | required | `custom:departures-card`                                                                                                                                                             |
-| `entities`       | list    | required | Departures sensors, each shown as a section or all as one list with `combine`, as an entity id or one with its heading                                                               |
-| `title`          | string  |          | Shown at the top of the card                                                                                                                                                         |
-| `departures`     | number  | `4`      | How many departures not cancelled each stop shows, or the whole list with `combine`, the large one included, with the cancelled ones among them and up to two arrivals that are over |
-| `show_cancelled` | boolean | `true`   | Show cancelled departures, struck through with the reason                                                                                                                            |
-| `show_notices`   | boolean | `true`   | Show the stop's notices, such as track works, under its name                                                                                                                         |
-| `full_texts`     | boolean | `false`  | Wrap the subtitle and the notices of later departures instead of cutting them short                                                                                                  |
-| `combine`        | boolean | `false`  | Show every stop's departures and arrivals as one list by time, not a section each                                                                                                    |
+| Name             | Type    | Default                                                                         | Description                                                                                                                                                                                                                                            |
+| ---------------- | ------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `type`           | string  | required                                                                        | `custom:departures-card`                                                                                                                                                                                                                               |
+| `entities`       | list    | required                                                                        | Departures sensors, each shown as a section or all as one list with `combine`, as an entity id or one with its heading                                                                                                                                 |
+| `title`          | string  |                                                                                 | Shown at the top of the card                                                                                                                                                                                                                           |
+| `departures`     | number  | `4`                                                                             | How many departures not cancelled each stop shows, or the whole list with `combine`, the large one included, with the cancelled ones among them and up to two arrivals that are over                                                                   |
+| `show_cancelled` | boolean | `true`                                                                          | Show cancelled departures, struck through with the reason                                                                                                                                                                                              |
+| `show_notices`   | boolean | `true`                                                                          | Show the stop's notices, such as track works, under its name                                                                                                                                                                                           |
+| `full_texts`     | boolean | `false`                                                                         | Wrap the subtitle and the notices of later departures instead of cutting them short                                                                                                                                                                    |
+| `combine`        | boolean | `false`                                                                         | Show every stop's departures and arrivals as one list by time, not a section each                                                                                                                                                                      |
+| `height_mode`    | string  | `fixed` when `height` is set, `max` when only `max_height` is, otherwise `auto` | How tall the card is. `auto` fits its content, `fixed` keeps it at `height`, `max` lets it grow up to `max_height`. In `fixed` and `max` the later departures scroll. A height in grid rows, set in the layout tab of a sections view, is used instead |
+| `height`         | number  |                                                                                 | The card's height in pixels, for `fixed`                                                                                                                                                                                                               |
+| `max_height`     | number  |                                                                                 | The card's greatest height in pixels, for `max`                                                                                                                                                                                                        |
 
 Each item of `entities` is an entity id, or an object with these keys:
 
@@ -124,6 +127,11 @@ show them in full.
 
 <img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/narrow-light.png#gh-light-mode-only" width="250" alt="A bus stop on a card half a section wide, the destination under the line and countdown, and the delays and platforms of later departures on lines of their own">
 <img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/narrow-dark.png#gh-dark-mode-only" width="250" alt="A bus stop on a card half a section wide, the destination under the line and countdown, and the delays and platforms of later departures on lines of their own">
+
+In the `fixed` and `max` height modes, or with a number of rows given to the card in a sections view, the title, the
+data's attribution and each stop's name, notices and next departure stay where they are, and only the stop's later
+departures scroll. The stops share the height, and a `fixed` height or `max` limit is never lower than what every stop's
+next departure and one departure after it need.
 
 ## Colours
 

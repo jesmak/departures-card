@@ -1,6 +1,6 @@
 /**
  * The card's visual editor: the title, the stops with their headings, how many departures each shows, cancelled ones,
- * notices, whether texts are shown in full and whether the stops are one list.
+ * notices, whether texts are shown in full, whether the stops are one list, and the card's height.
  */
 import { LitElement, css, html, nothing } from "lit";
 import type { CSSResultGroup, TemplateResult } from "lit";
@@ -9,6 +9,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { DEFAULT_DEPARTURES } from "./const";
 import { departuresSensors, sectionsOf } from "./departures";
 import type { HomeAssistant } from "./hass";
+import { heightData, heightSchema, tidyHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
 import type { DeparturesCardConfig, SectionConfig } from "./types";
 
@@ -51,19 +52,22 @@ function stopsSchema(hass: HomeAssistant, text: (key: string) => string) {
     ];
 }
 
-const OPTIONS_SCHEMA = [
-    {
-        type: "grid",
-        name: "",
-        schema: [
-            { name: "departures", selector: { number: { min: 1, max: 20, step: 1, mode: "box" } } },
-            { name: "show_cancelled", selector: { boolean: {} } },
-            { name: "show_notices", selector: { boolean: {} } },
-            { name: "full_texts", selector: { boolean: {} } },
-            { name: "combine", selector: { boolean: {} } },
-        ],
-    },
-];
+function optionsSchema(config: DeparturesCardConfig, text: (key: string) => string) {
+    return [
+        {
+            type: "grid",
+            name: "",
+            schema: [
+                { name: "departures", selector: { number: { min: 1, max: 20, step: 1, mode: "box" } } },
+                { name: "show_cancelled", selector: { boolean: {} } },
+                { name: "show_notices", selector: { boolean: {} } },
+                { name: "full_texts", selector: { boolean: {} } },
+                { name: "combine", selector: { boolean: {} } },
+            ],
+        },
+        ...heightSchema(config, text),
+    ];
+}
 
 /**
  * The form's values: the config over the defaults, every stop as an object. An option left empty in YAML is null, and
@@ -103,7 +107,7 @@ export class DeparturesCardEditor extends LitElement {
             return nothing;
         }
         // The form edits every stop as an object; plain entity ids are expanded for it.
-        const data = formData(this.config);
+        const data = formData(heightData(this.config));
         // Two forms, so that the stops' helper, which Home Assistant's list of objects doesn't show, sits under the stops.
         return html`
             <ha-form
@@ -117,7 +121,7 @@ export class DeparturesCardEditor extends LitElement {
             <ha-form
                 .hass=${this.hass}
                 .data=${data}
-                .schema=${OPTIONS_SCHEMA}
+                .schema=${optionsSchema(this.config, (key) => this.text(key))}
                 .computeLabel=${(entry: SchemaEntry) => this.text(`editor.${entry.name}`)}
                 .computeHelper=${(entry: SchemaEntry) => this.helper(entry.name)}
                 @value-changed=${this.valueChanged}
@@ -138,7 +142,7 @@ export class DeparturesCardEditor extends LitElement {
     }
 
     private valueChanged(event: CustomEvent<{ value: DeparturesCardConfig }>): void {
-        const config: DeparturesCardConfig = { ...event.detail.value };
+        const config: DeparturesCardConfig = tidyHeight(event.detail.value);
         config.entities = compactSections((config.entities ?? []) as SectionConfig[]);
         if (!config.title) {
             delete config.title;

@@ -4,6 +4,7 @@
         "description": "Seuraavat lähdöt pysäkeiltä, rautatieasemilta ja lentoasemilta",
         "invalid_configuration": "Virheellinen konfiguraatio. Lisää vähintään yksi pysäkkianturi.",
         "invalid_departures": "Virheellinen konfiguraatio. Lähtöjen määrän pitää olla kokonaisluku, vähintään 1.",
+        "invalid_height": "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikseleinä, ja korkeustilan (height_mode) auto, fixed tai max.",
         "no_entity": "Entiteettiä {entity} ei löydy",
         "not_departures": "{entity} ei ole pysäkkianturi",
         "unavailable": "Lähtötiedot eivät ole juuri nyt saatavilla",
@@ -42,6 +43,15 @@
         "full_texts": "Näytä tekstit kokonaan",
         "full_texts_helper": "Alaotsikko ja myöhempien lähtöjen tiedotteet rivitetään lyhentämisen sijaan",
         "combine": "Näytä yhtenä listana",
-        "combine_helper": "Kaikkien pysäkkien lähdöt ja saapumiset yhdessä listassa aikajärjestyksessä"
+        "combine_helper": "Kaikkien pysäkkien lähdöt ja saapumiset yhdessä listassa aikajärjestyksessä",
+        "height_mode": "Korkeus",
+        "height_mode_helper": "Osioihin jaetun näkymän asettelu-välilehdellä asetettu korkeus ohittaa tämän.",
+        "height_mode_auto": "Sisällön mukaan",
+        "height_mode_fixed": "Kiinteä",
+        "height_mode_max": "Kasvaa rajaan asti",
+        "height": "Kiinteä korkeus",
+        "height_helper": "Kortti on aina näin korkea, ja lähdöt vierivät sen sisällä.",
+        "max_height": "Enimmäiskorkeus",
+        "max_height_helper": "Kortti kasvaa sisältönsä mukana tähän korkeuteen asti, ja sen jälkeen lähdöt vierivät."
     }
 }

@@ -26,7 +26,9 @@ import {
     visibleDepartures,
 } from "./departures";
 import "./editor";
+import { ScrollFade, fadeStyles } from "./fade";
 import type { HassEntity, HomeAssistant } from "./hass";
+import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
 import type { Departure, DeparturesCardConfig, SectionConfig, ShownDeparture } from "./types";
 
@@ -63,10 +65,20 @@ registry.customCards.push({
 @customElement("departures-card")
 export class DeparturesCard extends LitElement {
     @property({ attribute: false }) public hass?: HomeAssistant;
+    /** Set by the dashboard: "grid" in a sections view. */
+    @property({ attribute: false }) public layout?: string;
     @state() private config?: DeparturesCardConfig;
     private ticker?: ReturnType<typeof setInterval>;
     private readonly resizes = new ResizeObserver(() => this.alignBadgesSoon());
     private frame?: number;
+
+    constructor() {
+        super();
+        // Fades the edges of each stop's later departures while the card is held to a height, through the card's own lifecycle.
+        new ScrollFade(this, () =>
+            this.renderRoot.querySelector("ha-card.held") ? this.renderRoot.querySelectorAll<HTMLElement>("section > .rows") : [],
+        );
+    }
 
     public static getConfigElement(): HTMLElement {
         return document.createElement("departures-card-editor");
@@ -87,6 +99,9 @@ export class DeparturesCard extends LitElement {
         if (config.departures != null && !(Number.isInteger(config.departures) && config.departures >= 1)) {
             throw new Error(translate(browserLanguage(), "common.invalid_departures"));
         }
+        if (!validHeight(config)) {
+            throw new Error(translate(browserLanguage(), "common.invalid_height"));
+        }
         this.config = { ...config, entities };
     }
 
@@ -102,12 +117,33 @@ export class DeparturesCard extends LitElement {
         const entities = this.config ? sectionsOf(this.config.entities).map((section) => section.entity) : [];
         const list = (ids: string[]) =>
             2 + rows + (ids.some((id) => statedDirection(this.hass?.states[id]) === "arrivals") ? ARRIVED_ROWS : 0);
-        return 1 + (!this.config || this.combines ? list(entities) : entities.reduce((size, id) => size + list([id]), 0));
+        const content = 1 + (!this.config || this.combines ? list(entities) : entities.reduce((size, id) => size + list([id]), 0));
+        return heightCardSize(this.config ?? {}, content, this.minimumHeight());
     }
 
     /** In a sections view the card takes a whole section by default and is never narrower than half of one. */
     public getGridOptions(): Record<string, unknown> {
-        return { columns: 12, min_columns: 6, rows: "auto" };
+        return { columns: 12, min_columns: 6, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
+    }
+
+    /**
+     * Held to a height, the title, the attribution and every stop's heading, next departure and first row after it
+     * still fit, with the stops one above the other as on a narrow card, as measured on a full section's width. Notices
+     * come with the data, so they aren't counted.
+     */
+    private minimumHeight(): number {
+        if (!this.config) {
+            return 0;
+        }
+        const padding = 32;
+        const title = this.config.title ? 41 : 0;
+        const attribution = 29;
+        const heading = 21;
+        const next = 56;
+        const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 49 : 0;
+        const divider = 29;
+        const stops = this.combines ? 1 : sectionsOf(this.config.entities).length;
+        return padding + title + attribution + stops * (heading + next + row) + (stops - 1) * divider;
     }
 
     /** The countdowns run on between the sensor's updates, so the card redraws itself while it is on the page. */
@@ -146,7 +182,28 @@ export class DeparturesCard extends LitElement {
      */
     private alignBadgesSoon(): void {
         cancelAnimationFrame(this.frame ?? 0);
-        this.frame = requestAnimationFrame(() => this.alignBadges());
+        this.frame = requestAnimationFrame(() => {
+            this.alignBadges();
+            this.keepNextDepartures();
+        });
+    }
+
+    /**
+     * Held to a height, the stops share it, but none is squeezed below its next departure and the first row after it,
+     * however much its notices take. That height comes with the data and the width, so it is measured with the badges.
+     */
+    private keepNextDepartures(): void {
+        const held = !!this.renderRoot.querySelector("ha-card.held");
+        for (const section of this.renderRoot.querySelectorAll<HTMLElement>("section")) {
+            const rows = section.querySelector<HTMLElement>(":scope > .rows");
+            const first = rows?.querySelector<HTMLElement>(".row");
+            if (held && rows && first) {
+                const bottom = section.clientTop + rows.offsetTop + rows.clientTop + first.offsetTop + first.offsetHeight;
+                section.style.minHeight = `${bottom}px`;
+            } else {
+                section.style.removeProperty("min-height");
+            }
+        }
     }
 
     private alignBadges(): void {
@@ -164,7 +221,8 @@ export class DeparturesCard extends LitElement {
 
     protected shouldUpdate(changed: PropertyValues): boolean {
         const previous = changed.get("hass") as HomeAssistant | undefined;
-        if (changed.has("config") || !this.config || !changed.has("hass") || !previous) {
+        // The layout decides whether the card is held to a height, so it redraws the card whatever else arrives with it.
+        if (changed.has("config") || changed.has("layout") || !this.config || !changed.has("hass") || !previous) {
             return true;
         }
         // Home Assistant hands the card every state change in the house; only its own sensors matter.
@@ -179,8 +237,9 @@ export class DeparturesCard extends LitElement {
         const attributions = [
             ...new Set(sections.map(({ entity }) => this.hass?.states[entity]?.attributes?.attribution).filter((text) => !!text)),
         ];
+        const height = heightStyle(this.config, this.layout, this.minimumHeight());
         return html`
-            <ha-card class=${this.config.full_texts ? "full" : ""}>
+            <ha-card class="${this.config.full_texts ? "full" : ""} ${height ? "held" : ""}" style=${height}>
                 ${this.config.title ? html`<h1 class="card-title">${this.config.title}</h1>` : nothing}
                 <div class="sections">${this.combines ? this.combined(sections) : sections.map((section) => this.section(section))}</div>
                 ${attributions.length ? html`<div class="attribution">${attributions.join(" · ")}</div>` : nothing}
@@ -449,372 +508,439 @@ export class DeparturesCard extends LitElement {
     }
 
     static get styles(): CSSResultGroup {
-        return css`
-            /* The card is the container its sections measure, so two stops sit side by side by the card's own width. */
-            ha-card {
-                container-type: inline-size;
-                padding: 16px;
-                font-variant-numeric: tabular-nums;
-            }
+        return [
+            css`
+                /* The card is the container its sections measure, so two stops sit side by side by the card's own width. */
+                ha-card {
+                    container-type: inline-size;
+                    padding: 16px;
+                    font-variant-numeric: tabular-nums;
+                }
 
-            .card-title {
-                margin: 0 0 12px;
-                font-size: var(--ha-card-header-font-size, 24px);
-                font-weight: var(--ha-font-weight-normal, 400);
-                line-height: 1.2;
-            }
+                .card-title {
+                    margin: 0 0 12px;
+                    font-size: var(--ha-card-header-font-size, 24px);
+                    font-weight: var(--ha-font-weight-normal, 400);
+                    line-height: 1.2;
+                }
 
-            .sections {
-                display: grid;
-                grid-template-columns: minmax(0, 1fr);
-            }
-
-            section + section {
-                border-top: 1px solid var(--divider-color);
-                margin-top: 14px;
-                padding-top: 14px;
-            }
-
-            @container (min-width: 620px) {
-                .sections:has(section + section) {
-                    grid-template-columns: repeat(2, minmax(0, 1fr));
-                    column-gap: 32px;
+                .sections {
+                    display: grid;
+                    grid-template-columns: minmax(0, 1fr);
                 }
 
                 section + section {
-                    border-top: none;
-                    margin-top: 0;
-                    padding-top: 0;
-                }
-
-                section:nth-child(2n) {
-                    border-left: 1px solid var(--divider-color);
-                    margin-left: -16px;
-                    padding-left: 16px;
-                }
-
-                section:nth-child(n + 3) {
                     border-top: 1px solid var(--divider-color);
                     margin-top: 14px;
                     padding-top: 14px;
                 }
-            }
 
-            .heading {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: baseline;
-                gap: 0 8px;
-                min-width: 0;
-                max-width: 100%;
-                padding: 0;
-                border: none;
-                background: none;
-                color: inherit;
-                font: inherit;
-                text-align: left;
-                cursor: pointer;
-            }
+                @container (min-width: 620px) {
+                    .sections:has(section + section) {
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                        column-gap: 32px;
+                    }
 
-            .name {
-                font-size: 14px;
-                font-weight: var(--ha-font-weight-medium, 500);
-                overflow-wrap: anywhere;
-            }
+                    section + section {
+                        border-top: none;
+                        margin-top: 0;
+                        padding-top: 0;
+                    }
 
-            .subtitle,
-            .message,
-            .meta,
-            .attribution,
-            .platform {
-                color: var(--secondary-text-color);
-            }
+                    section:nth-child(2n) {
+                        border-left: 1px solid var(--divider-color);
+                        margin-left: -16px;
+                        padding-left: 16px;
+                    }
 
-            /* A secondary text, cut short unless full_texts asks for it whole. */
-            .subtitle {
-                min-width: 0;
-                font-size: 14px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
+                    section:nth-child(n + 3) {
+                        border-top: 1px solid var(--divider-color);
+                        margin-top: 14px;
+                        padding-top: 14px;
+                    }
+                }
 
-            .full .subtitle {
-                white-space: normal;
-                overflow-wrap: anywhere;
-            }
-
-            .message {
-                padding: 8px 0 4px;
-            }
-
-            .next {
-                display: flex;
-                align-items: center;
-                gap: 14px;
-                margin-top: 10px;
-            }
-
-            .next-text {
-                flex: 1;
-                min-width: 0;
-            }
-
-            .next .headsign {
-                font-size: 20px;
-                font-weight: var(--ha-font-weight-medium, 500);
-                line-height: 1.3;
-            }
-
-            .headsign {
-                overflow-wrap: anywhere;
-            }
-
-            /* On a narrow card the large departure's destination takes a line of its own, under the badge and countdown. */
-            @container (max-width: 399px) {
-                .next {
+                .heading {
+                    display: flex;
                     flex-wrap: wrap;
-                    row-gap: 6px;
+                    align-items: baseline;
+                    gap: 0 8px;
+                    min-width: 0;
+                    max-width: 100%;
+                    padding: 0;
+                    border: none;
+                    background: none;
+                    color: inherit;
+                    font: inherit;
+                    text-align: left;
+                    cursor: pointer;
+                }
+
+                .name {
+                    font-size: 14px;
+                    font-weight: var(--ha-font-weight-medium, 500);
+                    overflow-wrap: anywhere;
+                }
+
+                .subtitle,
+                .message,
+                .meta,
+                .attribution,
+                .platform {
+                    color: var(--secondary-text-color);
+                }
+
+                /* A secondary text, cut short unless full_texts asks for it whole. */
+                .subtitle {
+                    min-width: 0;
+                    font-size: 14px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .full .subtitle {
+                    white-space: normal;
+                    overflow-wrap: anywhere;
+                }
+
+                .message {
+                    padding: 8px 0 4px;
+                }
+
+                .next {
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    margin-top: 10px;
                 }
 
                 .next-text {
-                    order: 3;
-                    flex-basis: 100%;
+                    flex: 1;
+                    min-width: 0;
+                }
+
+                .next .headsign {
+                    font-size: 20px;
+                    font-weight: var(--ha-font-weight-medium, 500);
+                    line-height: 1.3;
+                }
+
+                .headsign {
+                    overflow-wrap: anywhere;
+                }
+
+                /* On a narrow card the large departure's destination takes a line of its own, under the badge and countdown. */
+                @container (max-width: 399px) {
+                    .next {
+                        flex-wrap: wrap;
+                        row-gap: 6px;
+                    }
+
+                    .next-text {
+                        order: 3;
+                        flex-basis: 100%;
+                    }
+
+                    .countdown {
+                        margin-left: auto;
+                    }
+                }
+
+                .meta {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    gap: 4px 6px;
+                    font-size: 13px;
                 }
 
                 .countdown {
-                    margin-left: auto;
+                    flex: none;
+                    font-size: 32px;
+                    font-weight: var(--ha-font-weight-bold, 700);
+                    line-height: 1.1;
+                    white-space: nowrap;
                 }
-            }
 
-            .meta {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 4px 6px;
-                font-size: 13px;
-            }
+                .unit {
+                    font-size: 16px;
+                    font-weight: var(--ha-font-weight-medium, 500);
+                }
 
-            .countdown {
-                flex: none;
-                font-size: 32px;
-                font-weight: var(--ha-font-weight-bold, 700);
-                line-height: 1.1;
-                white-space: nowrap;
-            }
-
-            .unit {
-                font-size: 16px;
-                font-weight: var(--ha-font-weight-medium, 500);
-            }
-
-            /* A line known by a long name rather than a number wraps inside its badge at its spaces. A word never splits:
+                /* A line known by a long name rather than a number wraps inside its badge at its spaces. A word never splits:
                the badge is at least as wide as its longest word, as a flight number cut in two reads as another flight. */
-            .badge {
-                flex: none;
-                box-sizing: border-box;
-                min-width: min-content;
-                max-width: 40cqw;
-                text-align: center;
-                font-weight: var(--ha-font-weight-bold, 700);
-                overflow-wrap: break-word;
-            }
+                .badge {
+                    flex: none;
+                    box-sizing: border-box;
+                    min-width: min-content;
+                    max-width: 40cqw;
+                    text-align: center;
+                    font-weight: var(--ha-font-weight-bold, 700);
+                    overflow-wrap: break-word;
+                }
 
-            .badge .line {
-                display: inline-block;
-                min-width: 24px;
-            }
+                .badge .line {
+                    display: inline-block;
+                    min-width: 24px;
+                }
 
-            .badge.large {
-                padding: 6px 10px;
-                border-radius: 10px;
-                font-size: 18px;
-            }
+                .badge.large {
+                    padding: 6px 10px;
+                    border-radius: 10px;
+                    font-size: 18px;
+                }
 
-            .badge.small {
-                padding: 1px 6px;
-                border-radius: 8px;
-                font-size: 13px;
-            }
+                .badge.small {
+                    padding: 1px 6px;
+                    border-radius: 8px;
+                    font-size: 13px;
+                }
 
-            .rows .badge.small {
-                min-width: var(--badge-width, min-content);
-            }
+                .rows .badge.small {
+                    min-width: var(--badge-width, min-content);
+                }
 
-            .rows {
-                margin-top: 12px;
-                padding-top: 4px;
-                border-top: 1px solid var(--divider-color);
-            }
+                .rows {
+                    margin-top: 12px;
+                    padding-top: 4px;
+                    border-top: 1px solid var(--divider-color);
+                }
 
-            /* A row stays on one line while its destination has room, and moves what doesn't fit to the next. */
-            .row {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 2px 10px;
-                padding: 5px 0;
-                font-size: 14px;
-            }
+                /* A row stays on one line while its destination has room, and moves what doesn't fit to the next. */
+                .row {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    gap: 2px 10px;
+                    padding: 5px 0;
+                    font-size: 14px;
+                }
 
-            .time {
-                flex: none;
-                min-width: 44px;
-                font-weight: var(--ha-font-weight-bold, 700);
-                white-space: nowrap;
-            }
+                .time {
+                    flex: none;
+                    min-width: 44px;
+                    font-weight: var(--ha-font-weight-bold, 700);
+                    white-space: nowrap;
+                }
 
-            /* The day in front of a time that isn't today: quieter than the time, but there. */
-            .day {
-                font-size: 0.75em;
-                font-weight: var(--ha-font-weight-medium, 500);
-                color: var(--secondary-text-color);
-            }
+                /* The day in front of a time that isn't today: quieter than the time, but there. */
+                .day {
+                    font-size: 0.75em;
+                    font-weight: var(--ha-font-weight-medium, 500);
+                    color: var(--secondary-text-color);
+                }
 
-            .rows.with-days .time {
-                min-width: 72px;
-            }
+                .rows.with-days .time {
+                    min-width: 72px;
+                }
 
-            /* Below 100 px the destination takes the next line, or a short one such as Pasila would sit squeezed between them. */
-            .row .headsign {
-                flex: 1 1 100px;
-                min-width: 0;
-            }
+                /* Below 100 px the destination takes the next line, or a short one such as Pasila would sit squeezed between them. */
+                .row .headsign {
+                    flex: 1 1 100px;
+                    min-width: 0;
+                }
 
-            .info {
-                flex: 0 1 auto;
-                min-width: 0;
-                margin-left: auto;
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: flex-end;
-                align-items: center;
-                gap: 2px 6px;
-                font-size: 12px;
-            }
+                .info {
+                    flex: 0 1 auto;
+                    min-width: 0;
+                    margin-left: auto;
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: flex-end;
+                    align-items: center;
+                    gap: 2px 6px;
+                    font-size: 12px;
+                }
 
-            /* Numbers stay whole: a track cut short is another track. */
-            .platform,
-            .late,
-            .early {
-                white-space: nowrap;
-            }
+                /* Numbers stay whole: a track cut short is another track. */
+                .platform,
+                .late,
+                .early {
+                    white-space: nowrap;
+                }
 
-            .row.cancelled .headsign,
-            .row.cancelled .time,
-            .row.came-in .headsign,
-            .row.came-in .time {
-                color: var(--secondary-text-color);
-            }
+                .row.cancelled .headsign,
+                .row.cancelled .time,
+                .row.came-in .headsign,
+                .row.came-in .time {
+                    color: var(--secondary-text-color);
+                }
 
-            /* A cancelled line's badge is a ring in the theme's own text colours, readable on any card, light or dark. */
-            .badge.cancelled {
-                background: none;
-                color: var(--secondary-text-color);
-                box-shadow: inset 0 0 0 2px var(--secondary-text-color);
-            }
+                /* A cancelled line's badge is a ring in the theme's own text colours, readable on any card, light or dark. */
+                .badge.cancelled {
+                    background: none;
+                    color: var(--secondary-text-color);
+                    box-shadow: inset 0 0 0 2px var(--secondary-text-color);
+                }
 
-            .row.came-in .badge {
-                opacity: 0.55;
-            }
+                .row.came-in .badge {
+                    opacity: 0.55;
+                }
 
-            /* One that has come in is good news, not a problem, so not in a notice's red. */
-            .arrived {
-                color: var(--success-color, #2e7d32);
-                font-weight: var(--ha-font-weight-medium, 500);
-            }
+                /* One that has come in is good news, not a problem, so not in a notice's red. */
+                .arrived {
+                    color: var(--success-color, #2e7d32);
+                    font-weight: var(--ha-font-weight-medium, 500);
+                }
 
-            /* A direction icon is a size larger than the text around it, so its arrow reads at a glance. */
-            .direction {
-                --mdc-icon-size: 17px;
-                width: 17px;
-                height: 17px;
-                display: inline-flex;
-                vertical-align: -3px;
-                margin-right: 4px;
-                color: var(--secondary-text-color);
-            }
+                /* A direction icon is a size larger than the text around it, so its arrow reads at a glance. */
+                .direction {
+                    --mdc-icon-size: 17px;
+                    width: 17px;
+                    height: 17px;
+                    display: inline-flex;
+                    vertical-align: -3px;
+                    margin-right: 4px;
+                    color: var(--secondary-text-color);
+                }
 
-            .next .direction {
-                --mdc-icon-size: 21px;
-                width: 21px;
-                height: 21px;
-            }
+                .next .direction {
+                    --mdc-icon-size: 21px;
+                    width: 21px;
+                    height: 21px;
+                }
 
-            .struck {
-                text-decoration: line-through;
-            }
+                .struck {
+                    text-decoration: line-through;
+                }
 
-            .live {
-                --mdc-icon-size: 14px;
-                width: 14px;
-                height: 14px;
-                display: inline-flex;
-                color: var(--success-color, #2e7d32);
-            }
+                .live {
+                    --mdc-icon-size: 14px;
+                    width: 14px;
+                    height: 14px;
+                    display: inline-flex;
+                    color: var(--success-color, #2e7d32);
+                }
 
-            .late {
-                color: var(--warning-color, #b45309);
-                font-weight: var(--ha-font-weight-medium, 500);
-            }
+                .late {
+                    color: var(--warning-color, #b45309);
+                    font-weight: var(--ha-font-weight-medium, 500);
+                }
 
-            .early {
-                color: var(--success-color, #2e7d32);
-                font-weight: var(--ha-font-weight-medium, 500);
-            }
+                .early {
+                    color: var(--success-color, #2e7d32);
+                    font-weight: var(--ha-font-weight-medium, 500);
+                }
 
-            .alert,
-            .notice {
-                color: var(--error-color, #c62828);
-                font-weight: var(--ha-font-weight-medium, 500);
-            }
+                .alert,
+                .notice {
+                    color: var(--error-color, #c62828);
+                    font-weight: var(--ha-font-weight-medium, 500);
+                }
 
-            .notice {
-                font-size: 13px;
-            }
+                .notice {
+                    font-size: 13px;
+                }
 
-            /* A notice for the whole stop, such as track works, stays readable in full: cut short it says nothing. */
-            .stop-notice {
-                display: flex;
-                align-items: flex-start;
-                gap: 6px;
-                margin-top: 8px;
-                padding: 6px 8px;
-                border-radius: 8px;
-                font-size: 13px;
-                line-height: 1.35;
-                color: var(--primary-text-color);
-                background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.12);
-            }
+                /* A notice for the whole stop, such as track works, stays readable in full: cut short it says nothing. */
+                .stop-notice {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 6px;
+                    margin-top: 8px;
+                    padding: 6px 8px;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    line-height: 1.35;
+                    color: var(--primary-text-color);
+                    background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.12);
+                }
 
-            .stop-notice ha-icon {
-                --mdc-icon-size: 16px;
-                flex: none;
-                width: 16px;
-                height: 16px;
-                margin-top: 1px;
-                color: var(--warning-color, #b45309);
-            }
+                .stop-notice ha-icon {
+                    --mdc-icon-size: 16px;
+                    flex: none;
+                    width: 16px;
+                    height: 16px;
+                    margin-top: 1px;
+                    color: var(--warning-color, #b45309);
+                }
 
-            /* A row's notice is a secondary text, cut short unless full_texts asks for it whole. */
-            .info .alert {
-                min-width: 0;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
+                /* A row's notice is a secondary text, cut short unless full_texts asks for it whole. */
+                .info .alert {
+                    min-width: 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
 
-            .full .info .alert {
-                white-space: normal;
-                overflow-wrap: anywhere;
-            }
+                .full .info .alert {
+                    white-space: normal;
+                    overflow-wrap: anywhere;
+                }
 
-            .attribution {
-                margin-top: 12px;
-                font-size: 11px;
-                text-align: right;
-            }
-        `;
+                .attribution {
+                    margin-top: 12px;
+                    font-size: 11px;
+                    text-align: right;
+                }
+
+                /*
+             * Held to a height, the card is a column whose title and attribution stay put. The stops share what is left
+             * as rows of their grid, each a column of its own whose heading, notices and next departure stay put while
+             * only its later departures scroll. A stop's measured minimum keeps those and one row in view.
+             */
+                ha-card.held {
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
+
+                .held .card-title,
+                .held .attribution {
+                    flex: none;
+                }
+
+                .held .sections {
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    overflow: hidden;
+                    align-content: start;
+                }
+
+                .held section {
+                    position: relative;
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    min-height: 0;
+                    overflow: hidden;
+                }
+
+                /* A stop without later departures has nothing to scroll and keeps its height. */
+                .held section:not(:has(> .rows)) {
+                    min-height: auto;
+                    overflow: visible;
+                }
+
+                .held section > * {
+                    flex: none;
+                }
+
+                .held .heading {
+                    align-self: flex-start;
+                }
+
+                /* Inside the card, as a held stop clips what is drawn outside it. */
+                .heading:focus-visible {
+                    outline: 2px solid var(--primary-color);
+                    outline-offset: -2px;
+                }
+
+                /* The top fade starts under the rows' own top border, so it doesn't erase it. */
+                .held section > .rows {
+                    --fade-top-offset: 1px;
+                    position: relative;
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    overflow-y: auto;
+                    overscroll-behavior: contain;
+                    scrollbar-width: thin;
+                }
+            `,
+            fadeStyles,
+        ];
     }
 }
 

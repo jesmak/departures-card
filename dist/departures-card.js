@@ -1,4 +1,4 @@
-/*! departures-card 1.3.0 | MIT License */
+/*! departures-card 1.4.0 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,7 +711,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.3.0";
+var CARD_VERSION = "1.4.0";
 var DEPARTURES_VERSION = 1;
 var DEFAULT_DEPARTURES = 4;
 var GONE_AFTER_MS = 6e4;
@@ -825,6 +825,70 @@ function isLight(hex) {
   return 1.05 / (luminance + 0.05) < 4.5;
 }
 
+// src/height.ts
+var HEIGHT_MODES = ["auto", "fixed", "max"];
+var pixels = (value) => value == null || typeof value === "number" && Number.isFinite(value) && value > 0;
+function validHeight(config) {
+  return (config.height_mode == null || HEIGHT_MODES.includes(config.height_mode)) && pixels(config.height) && pixels(config.max_height);
+}
+function heightMode(config) {
+  return config.height_mode ?? (config.height ? "fixed" : config.max_height ? "max" : "auto");
+}
+var ROW_HEIGHT = 56;
+var ROW_GAP = 8;
+function heightStyle(config, layout, minimum = 0) {
+  const rows = config.grid_options ? config.grid_options.rows : config.layout_options?.grid_rows;
+  if (layout === "grid" && typeof rows === "number") {
+    return "height: 100%";
+  }
+  const mode = heightMode(config);
+  if (mode === "fixed" && config.height) {
+    return `height: ${Math.max(config.height, minimum)}px`;
+  }
+  return mode === "max" && config.max_height ? `max-height: ${Math.max(config.max_height, minimum)}px` : "";
+}
+function gridMinRows(minimum) {
+  return Math.max(1, Math.ceil((minimum + ROW_GAP) / (ROW_HEIGHT + ROW_GAP)));
+}
+function heightCardSize(config, content, minimum = 0) {
+  const mode = heightMode(config);
+  if (mode === "fixed" && config.height) {
+    return Math.max(1, Math.round(Math.max(config.height, minimum) / 50));
+  }
+  return mode === "max" && config.max_height ? Math.max(1, Math.min(content, Math.round(Math.max(config.max_height, minimum) / 50))) : content;
+}
+function heightSchema(config, text) {
+  const mode = heightMode(config);
+  const field = (name) => ({
+    name,
+    selector: { number: { min: 100, max: 2e3, step: 10, unit_of_measurement: "px", mode: "box" } }
+  });
+  return [
+    {
+      name: "height_mode",
+      selector: {
+        select: { mode: "dropdown", options: HEIGHT_MODES.map((value) => ({ value, label: text(`editor.height_mode_${value}`) })) }
+      }
+    },
+    ...mode === "fixed" ? [field("height")] : mode === "max" ? [field("max_height")] : []
+  ];
+}
+function heightData(config) {
+  return { ...config, height_mode: heightMode(config) };
+}
+function tidyHeight(config) {
+  const tidied = { ...config };
+  for (const key of ["height", "max_height"]) {
+    if (!tidied[key]) {
+      delete tidied[key];
+    }
+  }
+  if (!tidied.height_mode || heightMode({ ...tidied, height_mode: void 0 }) === tidied.height_mode) {
+    delete tidied.height_mode;
+  }
+  return tidied;
+}
+
 // src/localize/languages/en.json
 var en_default = {
   common: {
@@ -832,6 +896,7 @@ var en_default = {
     description: "The next departures from stops, railway stations and airports",
     invalid_configuration: "Invalid configuration. Add at least one departures sensor.",
     invalid_departures: "Invalid configuration. The number of departures must be a whole number, at least 1.",
+    invalid_height: "Invalid height. height and max_height must be positive numbers of pixels, and height_mode auto, fixed or max.",
     no_entity: "Entity {entity} not found",
     not_departures: "{entity} is not a departures sensor",
     unavailable: "Departures are not available right now",
@@ -870,7 +935,16 @@ var en_default = {
     full_texts: "Show texts in full",
     full_texts_helper: "The subtitle and the notices of later departures wrap instead of being cut short",
     combine: "Show as one list",
-    combine_helper: "Every stop's departures and arrivals in one list in time order"
+    combine_helper: "Every stop's departures and arrivals in one list in time order",
+    height_mode: "Height",
+    height_mode_helper: "A height set in the layout tab of a sections view is used instead.",
+    height_mode_auto: "Fits the content",
+    height_mode_fixed: "Fixed",
+    height_mode_max: "Grows up to a limit",
+    height: "Fixed height",
+    height_helper: "The card is always this tall, and the departures scroll inside it.",
+    max_height: "Maximum height",
+    max_height_helper: "The card grows with its content up to this height, and then the departures scroll."
   }
 };
 
@@ -881,6 +955,7 @@ var fi_default = {
     description: "Seuraavat l\xE4hd\xF6t pys\xE4keilt\xE4, rautatieasemilta ja lentoasemilta",
     invalid_configuration: "Virheellinen konfiguraatio. Lis\xE4\xE4 v\xE4hint\xE4\xE4n yksi pys\xE4kkianturi.",
     invalid_departures: "Virheellinen konfiguraatio. L\xE4ht\xF6jen m\xE4\xE4r\xE4n pit\xE4\xE4 olla kokonaisluku, v\xE4hint\xE4\xE4n 1.",
+    invalid_height: "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikselein\xE4, ja korkeustilan (height_mode) auto, fixed tai max.",
     no_entity: "Entiteetti\xE4 {entity} ei l\xF6ydy",
     not_departures: "{entity} ei ole pys\xE4kkianturi",
     unavailable: "L\xE4ht\xF6tiedot eiv\xE4t ole juuri nyt saatavilla",
@@ -919,7 +994,16 @@ var fi_default = {
     full_texts: "N\xE4yt\xE4 tekstit kokonaan",
     full_texts_helper: "Alaotsikko ja my\xF6hempien l\xE4ht\xF6jen tiedotteet rivitet\xE4\xE4n lyhent\xE4misen sijaan",
     combine: "N\xE4yt\xE4 yhten\xE4 listana",
-    combine_helper: "Kaikkien pys\xE4kkien l\xE4hd\xF6t ja saapumiset yhdess\xE4 listassa aikaj\xE4rjestyksess\xE4"
+    combine_helper: "Kaikkien pys\xE4kkien l\xE4hd\xF6t ja saapumiset yhdess\xE4 listassa aikaj\xE4rjestyksess\xE4",
+    height_mode: "Korkeus",
+    height_mode_helper: "Osioihin jaetun n\xE4kym\xE4n asettelu-v\xE4lilehdell\xE4 asetettu korkeus ohittaa t\xE4m\xE4n.",
+    height_mode_auto: "Sis\xE4ll\xF6n mukaan",
+    height_mode_fixed: "Kiinte\xE4",
+    height_mode_max: "Kasvaa rajaan asti",
+    height: "Kiinte\xE4 korkeus",
+    height_helper: "Kortti on aina n\xE4in korkea, ja l\xE4hd\xF6t vieriv\xE4t sen sis\xE4ll\xE4.",
+    max_height: "Enimm\xE4iskorkeus",
+    max_height_helper: "Kortti kasvaa sis\xE4lt\xF6ns\xE4 mukana t\xE4h\xE4n korkeuteen asti, ja sen j\xE4lkeen l\xE4hd\xF6t vieriv\xE4t."
   }
 };
 
@@ -980,19 +1064,22 @@ function stopsSchema(hass, text) {
     }
   ];
 }
-var OPTIONS_SCHEMA = [
-  {
-    type: "grid",
-    name: "",
-    schema: [
-      { name: "departures", selector: { number: { min: 1, max: 20, step: 1, mode: "box" } } },
-      { name: "show_cancelled", selector: { boolean: {} } },
-      { name: "show_notices", selector: { boolean: {} } },
-      { name: "full_texts", selector: { boolean: {} } },
-      { name: "combine", selector: { boolean: {} } }
-    ]
-  }
-];
+function optionsSchema(config, text) {
+  return [
+    {
+      type: "grid",
+      name: "",
+      schema: [
+        { name: "departures", selector: { number: { min: 1, max: 20, step: 1, mode: "box" } } },
+        { name: "show_cancelled", selector: { boolean: {} } },
+        { name: "show_notices", selector: { boolean: {} } },
+        { name: "full_texts", selector: { boolean: {} } },
+        { name: "combine", selector: { boolean: {} } }
+      ]
+    },
+    ...heightSchema(config, text)
+  ];
+}
 function formData(config) {
   const set = Object.fromEntries(Object.entries(config).filter(([, value]) => value != null));
   const entities = typeof config.entities === "string" ? [config.entities] : config.entities;
@@ -1022,7 +1109,7 @@ var DeparturesCardEditor = class extends i4 {
     if (!this.hass) {
       return A;
     }
-    const data = formData(this.config);
+    const data = formData(heightData(this.config));
     return b2`
             <ha-form
                 .hass=${this.hass}
@@ -1035,7 +1122,7 @@ var DeparturesCardEditor = class extends i4 {
             <ha-form
                 .hass=${this.hass}
                 .data=${data}
-                .schema=${OPTIONS_SCHEMA}
+                .schema=${optionsSchema(this.config, (key) => this.text(key))}
                 .computeLabel=${(entry) => this.text(`editor.${entry.name}`)}
                 .computeHelper=${(entry) => this.helper(entry.name)}
                 @value-changed=${this.valueChanged}
@@ -1054,7 +1141,7 @@ var DeparturesCardEditor = class extends i4 {
         `;
   }
   valueChanged(event) {
-    const config = { ...event.detail.value };
+    const config = tidyHeight(event.detail.value);
     config.entities = compactSections(config.entities ?? []);
     if (!config.title) {
       delete config.title;
@@ -1088,6 +1175,104 @@ DeparturesCardEditor = __decorateClass([
   t3("departures-card-editor")
 ], DeparturesCardEditor);
 
+// src/fade.ts
+var fadeStyles = i`
+    .fades {
+        --fade-length: min(24px, 25%);
+        scroll-padding-block: calc(var(--fade-top-offset, 0px) + var(--fade-length, 24px)) var(--fade-length, 24px);
+    }
+
+    .fade-top {
+        mask-image: linear-gradient(
+            to bottom,
+            #000 var(--fade-top-offset, 0px),
+            transparent var(--fade-top-offset, 0px),
+            #000 calc(var(--fade-top-offset, 0px) + var(--fade-length, 24px))
+        );
+    }
+
+    .fade-bottom {
+        mask-image: linear-gradient(to top, transparent, #000 var(--fade-length, 24px));
+    }
+
+    .fade-top.fade-bottom {
+        mask-image: linear-gradient(
+            to bottom,
+            #000 var(--fade-top-offset, 0px),
+            transparent var(--fade-top-offset, 0px),
+            #000 calc(var(--fade-top-offset, 0px) + var(--fade-length, 24px)),
+            #000 calc(100% - var(--fade-length, 24px)),
+            transparent
+        );
+    }
+`;
+function markFade(part) {
+  const hidden = part.scrollHeight - part.clientHeight;
+  part.classList.toggle("fade-top", hidden > 1 && part.scrollTop > 1);
+  part.classList.toggle("fade-bottom", hidden > 1 && hidden - part.scrollTop > 1);
+}
+var onScroll = (event) => markFade(event.currentTarget);
+var ScrollFade = class {
+  constructor(host, parts) {
+    this.host = host;
+    this.parts = parts;
+    /** Each followed part with the children whose size it watches. */
+    this.followed = /* @__PURE__ */ new Map();
+    this.resized = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver((entries) => {
+      for (const { target } of entries) {
+        const part = this.followed.has(target) ? target : target.parentElement;
+        if (part && this.followed.has(part)) {
+          markFade(part);
+        }
+      }
+    });
+    host.addController(this);
+  }
+  hostConnected() {
+    if (this.host.hasUpdated) {
+      this.follow();
+    }
+  }
+  hostUpdated() {
+    if (this.host.isConnected) {
+      this.follow();
+    }
+  }
+  hostDisconnected() {
+    for (const part of [...this.followed.keys()]) {
+      this.forget(part);
+    }
+  }
+  follow() {
+    const now = new Set(this.parts());
+    for (const part of [...this.followed.keys()]) {
+      if (!now.has(part)) {
+        this.forget(part);
+      }
+    }
+    for (const part of now) {
+      if (!this.followed.has(part)) {
+        part.addEventListener("scroll", onScroll, { passive: true });
+        this.resized?.observe(part);
+      }
+      part.classList.add("fades");
+      const before = this.followed.get(part) ?? [];
+      const children = [...part.children];
+      before.filter((child) => !children.includes(child)).forEach((child) => this.resized?.unobserve(child));
+      children.filter((child) => !before.includes(child)).forEach((child) => this.resized?.observe(child));
+      this.followed.set(part, children);
+      markFade(part);
+    }
+  }
+  forget(part) {
+    this.followed.get(part)?.forEach((child) => this.resized?.unobserve(child));
+    this.followed.delete(part);
+    part.removeEventListener("scroll", onScroll);
+    this.resized?.unobserve(part);
+    part.classList.remove("fades", "fade-top", "fade-bottom");
+  }
+};
+
 // src/departures-card.ts
 var DIRECTION_ICONS = {
   plane: { departing: "mdi:airplane-takeoff", arriving: "mdi:airplane-landing" },
@@ -1110,8 +1295,12 @@ registry.customCards.push({
 });
 var DeparturesCard = class extends i4 {
   constructor() {
-    super(...arguments);
+    super();
     this.resizes = new ResizeObserver(() => this.alignBadgesSoon());
+    new ScrollFade(
+      this,
+      () => this.renderRoot.querySelector("ha-card.held") ? this.renderRoot.querySelectorAll("section > .rows") : []
+    );
   }
   static getConfigElement() {
     return document.createElement("departures-card-editor");
@@ -1128,6 +1317,9 @@ var DeparturesCard = class extends i4 {
     if (config.departures != null && !(Number.isInteger(config.departures) && config.departures >= 1)) {
       throw new Error(translate(browserLanguage(), "common.invalid_departures"));
     }
+    if (!validHeight(config)) {
+      throw new Error(translate(browserLanguage(), "common.invalid_height"));
+    }
     this.config = { ...config, entities };
   }
   /** One list only from two different sensors or more: one sensor given twice has nothing to merge. */
@@ -1140,11 +1332,31 @@ var DeparturesCard = class extends i4 {
     const rows = this.config?.departures ?? DEFAULT_DEPARTURES;
     const entities = this.config ? sectionsOf(this.config.entities).map((section) => section.entity) : [];
     const list = (ids) => 2 + rows + (ids.some((id) => statedDirection(this.hass?.states[id]) === "arrivals") ? ARRIVED_ROWS : 0);
-    return 1 + (!this.config || this.combines ? list(entities) : entities.reduce((size, id) => size + list([id]), 0));
+    const content = 1 + (!this.config || this.combines ? list(entities) : entities.reduce((size, id) => size + list([id]), 0));
+    return heightCardSize(this.config ?? {}, content, this.minimumHeight());
   }
   /** In a sections view the card takes a whole section by default and is never narrower than half of one. */
   getGridOptions() {
-    return { columns: 12, min_columns: 6, rows: "auto" };
+    return { columns: 12, min_columns: 6, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
+  }
+  /**
+   * Held to a height, the title, the attribution and every stop's heading, next departure and first row after it
+   * still fit, with the stops one above the other as on a narrow card, as measured on a full section's width. Notices
+   * come with the data, so they aren't counted.
+   */
+  minimumHeight() {
+    if (!this.config) {
+      return 0;
+    }
+    const padding = 32;
+    const title = this.config.title ? 41 : 0;
+    const attribution = 29;
+    const heading = 21;
+    const next = 56;
+    const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 49 : 0;
+    const divider = 29;
+    const stops = this.combines ? 1 : sectionsOf(this.config.entities).length;
+    return padding + title + attribution + stops * (heading + next + row) + (stops - 1) * divider;
   }
   /** The countdowns run on between the sensor's updates, so the card redraws itself while it is on the page. */
   connectedCallback() {
@@ -1177,7 +1389,27 @@ var DeparturesCard = class extends i4 {
    */
   alignBadgesSoon() {
     cancelAnimationFrame(this.frame ?? 0);
-    this.frame = requestAnimationFrame(() => this.alignBadges());
+    this.frame = requestAnimationFrame(() => {
+      this.alignBadges();
+      this.keepNextDepartures();
+    });
+  }
+  /**
+   * Held to a height, the stops share it, but none is squeezed below its next departure and the first row after it,
+   * however much its notices take. That height comes with the data and the width, so it is measured with the badges.
+   */
+  keepNextDepartures() {
+    const held = !!this.renderRoot.querySelector("ha-card.held");
+    for (const section of this.renderRoot.querySelectorAll("section")) {
+      const rows = section.querySelector(":scope > .rows");
+      const first = rows?.querySelector(".row");
+      if (held && rows && first) {
+        const bottom = section.clientTop + rows.offsetTop + rows.clientTop + first.offsetTop + first.offsetHeight;
+        section.style.minHeight = `${bottom}px`;
+      } else {
+        section.style.removeProperty("min-height");
+      }
+    }
   }
   alignBadges() {
     for (const rows of this.renderRoot.querySelectorAll(".rows")) {
@@ -1191,7 +1423,7 @@ var DeparturesCard = class extends i4 {
   }
   shouldUpdate(changed) {
     const previous = changed.get("hass");
-    if (changed.has("config") || !this.config || !changed.has("hass") || !previous) {
+    if (changed.has("config") || changed.has("layout") || !this.config || !changed.has("hass") || !previous) {
       return true;
     }
     return sectionsOf(this.config.entities).some(({ entity }) => previous.states[entity] !== this.hass?.states[entity]);
@@ -1204,8 +1436,9 @@ var DeparturesCard = class extends i4 {
     const attributions = [
       ...new Set(sections.map(({ entity }) => this.hass?.states[entity]?.attributes?.attribution).filter((text) => !!text))
     ];
+    const height = heightStyle(this.config, this.layout, this.minimumHeight());
     return b2`
-            <ha-card class=${this.config.full_texts ? "full" : ""}>
+            <ha-card class="${this.config.full_texts ? "full" : ""} ${height ? "held" : ""}" style=${height}>
                 ${this.config.title ? b2`<h1 class="card-title">${this.config.title}</h1>` : A}
                 <div class="sections">${this.combines ? this.combined(sections) : sections.map((section) => this.section(section))}</div>
                 ${attributions.length ? b2`<div class="attribution">${attributions.join(" \xB7 ")}</div>` : A}
@@ -1431,377 +1664,447 @@ var DeparturesCard = class extends i4 {
     return this.hass?.locale?.language ?? this.hass?.language ?? browserLanguage();
   }
   static get styles() {
-    return i`
-            /* The card is the container its sections measure, so two stops sit side by side by the card's own width. */
-            ha-card {
-                container-type: inline-size;
-                padding: 16px;
-                font-variant-numeric: tabular-nums;
-            }
+    return [
+      i`
+                /* The card is the container its sections measure, so two stops sit side by side by the card's own width. */
+                ha-card {
+                    container-type: inline-size;
+                    padding: 16px;
+                    font-variant-numeric: tabular-nums;
+                }
 
-            .card-title {
-                margin: 0 0 12px;
-                font-size: var(--ha-card-header-font-size, 24px);
-                font-weight: var(--ha-font-weight-normal, 400);
-                line-height: 1.2;
-            }
+                .card-title {
+                    margin: 0 0 12px;
+                    font-size: var(--ha-card-header-font-size, 24px);
+                    font-weight: var(--ha-font-weight-normal, 400);
+                    line-height: 1.2;
+                }
 
-            .sections {
-                display: grid;
-                grid-template-columns: minmax(0, 1fr);
-            }
-
-            section + section {
-                border-top: 1px solid var(--divider-color);
-                margin-top: 14px;
-                padding-top: 14px;
-            }
-
-            @container (min-width: 620px) {
-                .sections:has(section + section) {
-                    grid-template-columns: repeat(2, minmax(0, 1fr));
-                    column-gap: 32px;
+                .sections {
+                    display: grid;
+                    grid-template-columns: minmax(0, 1fr);
                 }
 
                 section + section {
-                    border-top: none;
-                    margin-top: 0;
-                    padding-top: 0;
-                }
-
-                section:nth-child(2n) {
-                    border-left: 1px solid var(--divider-color);
-                    margin-left: -16px;
-                    padding-left: 16px;
-                }
-
-                section:nth-child(n + 3) {
                     border-top: 1px solid var(--divider-color);
                     margin-top: 14px;
                     padding-top: 14px;
                 }
-            }
 
-            .heading {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: baseline;
-                gap: 0 8px;
-                min-width: 0;
-                max-width: 100%;
-                padding: 0;
-                border: none;
-                background: none;
-                color: inherit;
-                font: inherit;
-                text-align: left;
-                cursor: pointer;
-            }
+                @container (min-width: 620px) {
+                    .sections:has(section + section) {
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                        column-gap: 32px;
+                    }
 
-            .name {
-                font-size: 14px;
-                font-weight: var(--ha-font-weight-medium, 500);
-                overflow-wrap: anywhere;
-            }
+                    section + section {
+                        border-top: none;
+                        margin-top: 0;
+                        padding-top: 0;
+                    }
 
-            .subtitle,
-            .message,
-            .meta,
-            .attribution,
-            .platform {
-                color: var(--secondary-text-color);
-            }
+                    section:nth-child(2n) {
+                        border-left: 1px solid var(--divider-color);
+                        margin-left: -16px;
+                        padding-left: 16px;
+                    }
 
-            /* A secondary text, cut short unless full_texts asks for it whole. */
-            .subtitle {
-                min-width: 0;
-                font-size: 14px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
+                    section:nth-child(n + 3) {
+                        border-top: 1px solid var(--divider-color);
+                        margin-top: 14px;
+                        padding-top: 14px;
+                    }
+                }
 
-            .full .subtitle {
-                white-space: normal;
-                overflow-wrap: anywhere;
-            }
-
-            .message {
-                padding: 8px 0 4px;
-            }
-
-            .next {
-                display: flex;
-                align-items: center;
-                gap: 14px;
-                margin-top: 10px;
-            }
-
-            .next-text {
-                flex: 1;
-                min-width: 0;
-            }
-
-            .next .headsign {
-                font-size: 20px;
-                font-weight: var(--ha-font-weight-medium, 500);
-                line-height: 1.3;
-            }
-
-            .headsign {
-                overflow-wrap: anywhere;
-            }
-
-            /* On a narrow card the large departure's destination takes a line of its own, under the badge and countdown. */
-            @container (max-width: 399px) {
-                .next {
+                .heading {
+                    display: flex;
                     flex-wrap: wrap;
-                    row-gap: 6px;
+                    align-items: baseline;
+                    gap: 0 8px;
+                    min-width: 0;
+                    max-width: 100%;
+                    padding: 0;
+                    border: none;
+                    background: none;
+                    color: inherit;
+                    font: inherit;
+                    text-align: left;
+                    cursor: pointer;
+                }
+
+                .name {
+                    font-size: 14px;
+                    font-weight: var(--ha-font-weight-medium, 500);
+                    overflow-wrap: anywhere;
+                }
+
+                .subtitle,
+                .message,
+                .meta,
+                .attribution,
+                .platform {
+                    color: var(--secondary-text-color);
+                }
+
+                /* A secondary text, cut short unless full_texts asks for it whole. */
+                .subtitle {
+                    min-width: 0;
+                    font-size: 14px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .full .subtitle {
+                    white-space: normal;
+                    overflow-wrap: anywhere;
+                }
+
+                .message {
+                    padding: 8px 0 4px;
+                }
+
+                .next {
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    margin-top: 10px;
                 }
 
                 .next-text {
-                    order: 3;
-                    flex-basis: 100%;
+                    flex: 1;
+                    min-width: 0;
+                }
+
+                .next .headsign {
+                    font-size: 20px;
+                    font-weight: var(--ha-font-weight-medium, 500);
+                    line-height: 1.3;
+                }
+
+                .headsign {
+                    overflow-wrap: anywhere;
+                }
+
+                /* On a narrow card the large departure's destination takes a line of its own, under the badge and countdown. */
+                @container (max-width: 399px) {
+                    .next {
+                        flex-wrap: wrap;
+                        row-gap: 6px;
+                    }
+
+                    .next-text {
+                        order: 3;
+                        flex-basis: 100%;
+                    }
+
+                    .countdown {
+                        margin-left: auto;
+                    }
+                }
+
+                .meta {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    gap: 4px 6px;
+                    font-size: 13px;
                 }
 
                 .countdown {
-                    margin-left: auto;
+                    flex: none;
+                    font-size: 32px;
+                    font-weight: var(--ha-font-weight-bold, 700);
+                    line-height: 1.1;
+                    white-space: nowrap;
                 }
-            }
 
-            .meta {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 4px 6px;
-                font-size: 13px;
-            }
+                .unit {
+                    font-size: 16px;
+                    font-weight: var(--ha-font-weight-medium, 500);
+                }
 
-            .countdown {
-                flex: none;
-                font-size: 32px;
-                font-weight: var(--ha-font-weight-bold, 700);
-                line-height: 1.1;
-                white-space: nowrap;
-            }
-
-            .unit {
-                font-size: 16px;
-                font-weight: var(--ha-font-weight-medium, 500);
-            }
-
-            /* A line known by a long name rather than a number wraps inside its badge at its spaces. A word never splits:
+                /* A line known by a long name rather than a number wraps inside its badge at its spaces. A word never splits:
                the badge is at least as wide as its longest word, as a flight number cut in two reads as another flight. */
-            .badge {
-                flex: none;
-                box-sizing: border-box;
-                min-width: min-content;
-                max-width: 40cqw;
-                text-align: center;
-                font-weight: var(--ha-font-weight-bold, 700);
-                overflow-wrap: break-word;
-            }
+                .badge {
+                    flex: none;
+                    box-sizing: border-box;
+                    min-width: min-content;
+                    max-width: 40cqw;
+                    text-align: center;
+                    font-weight: var(--ha-font-weight-bold, 700);
+                    overflow-wrap: break-word;
+                }
 
-            .badge .line {
-                display: inline-block;
-                min-width: 24px;
-            }
+                .badge .line {
+                    display: inline-block;
+                    min-width: 24px;
+                }
 
-            .badge.large {
-                padding: 6px 10px;
-                border-radius: 10px;
-                font-size: 18px;
-            }
+                .badge.large {
+                    padding: 6px 10px;
+                    border-radius: 10px;
+                    font-size: 18px;
+                }
 
-            .badge.small {
-                padding: 1px 6px;
-                border-radius: 8px;
-                font-size: 13px;
-            }
+                .badge.small {
+                    padding: 1px 6px;
+                    border-radius: 8px;
+                    font-size: 13px;
+                }
 
-            .rows .badge.small {
-                min-width: var(--badge-width, min-content);
-            }
+                .rows .badge.small {
+                    min-width: var(--badge-width, min-content);
+                }
 
-            .rows {
-                margin-top: 12px;
-                padding-top: 4px;
-                border-top: 1px solid var(--divider-color);
-            }
+                .rows {
+                    margin-top: 12px;
+                    padding-top: 4px;
+                    border-top: 1px solid var(--divider-color);
+                }
 
-            /* A row stays on one line while its destination has room, and moves what doesn't fit to the next. */
-            .row {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 2px 10px;
-                padding: 5px 0;
-                font-size: 14px;
-            }
+                /* A row stays on one line while its destination has room, and moves what doesn't fit to the next. */
+                .row {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    gap: 2px 10px;
+                    padding: 5px 0;
+                    font-size: 14px;
+                }
 
-            .time {
-                flex: none;
-                min-width: 44px;
-                font-weight: var(--ha-font-weight-bold, 700);
-                white-space: nowrap;
-            }
+                .time {
+                    flex: none;
+                    min-width: 44px;
+                    font-weight: var(--ha-font-weight-bold, 700);
+                    white-space: nowrap;
+                }
 
-            /* The day in front of a time that isn't today: quieter than the time, but there. */
-            .day {
-                font-size: 0.75em;
-                font-weight: var(--ha-font-weight-medium, 500);
-                color: var(--secondary-text-color);
-            }
+                /* The day in front of a time that isn't today: quieter than the time, but there. */
+                .day {
+                    font-size: 0.75em;
+                    font-weight: var(--ha-font-weight-medium, 500);
+                    color: var(--secondary-text-color);
+                }
 
-            .rows.with-days .time {
-                min-width: 72px;
-            }
+                .rows.with-days .time {
+                    min-width: 72px;
+                }
 
-            /* Below 100 px the destination takes the next line, or a short one such as Pasila would sit squeezed between them. */
-            .row .headsign {
-                flex: 1 1 100px;
-                min-width: 0;
-            }
+                /* Below 100 px the destination takes the next line, or a short one such as Pasila would sit squeezed between them. */
+                .row .headsign {
+                    flex: 1 1 100px;
+                    min-width: 0;
+                }
 
-            .info {
-                flex: 0 1 auto;
-                min-width: 0;
-                margin-left: auto;
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: flex-end;
-                align-items: center;
-                gap: 2px 6px;
-                font-size: 12px;
-            }
+                .info {
+                    flex: 0 1 auto;
+                    min-width: 0;
+                    margin-left: auto;
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: flex-end;
+                    align-items: center;
+                    gap: 2px 6px;
+                    font-size: 12px;
+                }
 
-            /* Numbers stay whole: a track cut short is another track. */
-            .platform,
-            .late,
-            .early {
-                white-space: nowrap;
-            }
+                /* Numbers stay whole: a track cut short is another track. */
+                .platform,
+                .late,
+                .early {
+                    white-space: nowrap;
+                }
 
-            .row.cancelled .headsign,
-            .row.cancelled .time,
-            .row.came-in .headsign,
-            .row.came-in .time {
-                color: var(--secondary-text-color);
-            }
+                .row.cancelled .headsign,
+                .row.cancelled .time,
+                .row.came-in .headsign,
+                .row.came-in .time {
+                    color: var(--secondary-text-color);
+                }
 
-            /* A cancelled line's badge is a ring in the theme's own text colours, readable on any card, light or dark. */
-            .badge.cancelled {
-                background: none;
-                color: var(--secondary-text-color);
-                box-shadow: inset 0 0 0 2px var(--secondary-text-color);
-            }
+                /* A cancelled line's badge is a ring in the theme's own text colours, readable on any card, light or dark. */
+                .badge.cancelled {
+                    background: none;
+                    color: var(--secondary-text-color);
+                    box-shadow: inset 0 0 0 2px var(--secondary-text-color);
+                }
 
-            .row.came-in .badge {
-                opacity: 0.55;
-            }
+                .row.came-in .badge {
+                    opacity: 0.55;
+                }
 
-            /* One that has come in is good news, not a problem, so not in a notice's red. */
-            .arrived {
-                color: var(--success-color, #2e7d32);
-                font-weight: var(--ha-font-weight-medium, 500);
-            }
+                /* One that has come in is good news, not a problem, so not in a notice's red. */
+                .arrived {
+                    color: var(--success-color, #2e7d32);
+                    font-weight: var(--ha-font-weight-medium, 500);
+                }
 
-            /* A direction icon is a size larger than the text around it, so its arrow reads at a glance. */
-            .direction {
-                --mdc-icon-size: 17px;
-                width: 17px;
-                height: 17px;
-                display: inline-flex;
-                vertical-align: -3px;
-                margin-right: 4px;
-                color: var(--secondary-text-color);
-            }
+                /* A direction icon is a size larger than the text around it, so its arrow reads at a glance. */
+                .direction {
+                    --mdc-icon-size: 17px;
+                    width: 17px;
+                    height: 17px;
+                    display: inline-flex;
+                    vertical-align: -3px;
+                    margin-right: 4px;
+                    color: var(--secondary-text-color);
+                }
 
-            .next .direction {
-                --mdc-icon-size: 21px;
-                width: 21px;
-                height: 21px;
-            }
+                .next .direction {
+                    --mdc-icon-size: 21px;
+                    width: 21px;
+                    height: 21px;
+                }
 
-            .struck {
-                text-decoration: line-through;
-            }
+                .struck {
+                    text-decoration: line-through;
+                }
 
-            .live {
-                --mdc-icon-size: 14px;
-                width: 14px;
-                height: 14px;
-                display: inline-flex;
-                color: var(--success-color, #2e7d32);
-            }
+                .live {
+                    --mdc-icon-size: 14px;
+                    width: 14px;
+                    height: 14px;
+                    display: inline-flex;
+                    color: var(--success-color, #2e7d32);
+                }
 
-            .late {
-                color: var(--warning-color, #b45309);
-                font-weight: var(--ha-font-weight-medium, 500);
-            }
+                .late {
+                    color: var(--warning-color, #b45309);
+                    font-weight: var(--ha-font-weight-medium, 500);
+                }
 
-            .early {
-                color: var(--success-color, #2e7d32);
-                font-weight: var(--ha-font-weight-medium, 500);
-            }
+                .early {
+                    color: var(--success-color, #2e7d32);
+                    font-weight: var(--ha-font-weight-medium, 500);
+                }
 
-            .alert,
-            .notice {
-                color: var(--error-color, #c62828);
-                font-weight: var(--ha-font-weight-medium, 500);
-            }
+                .alert,
+                .notice {
+                    color: var(--error-color, #c62828);
+                    font-weight: var(--ha-font-weight-medium, 500);
+                }
 
-            .notice {
-                font-size: 13px;
-            }
+                .notice {
+                    font-size: 13px;
+                }
 
-            /* A notice for the whole stop, such as track works, stays readable in full: cut short it says nothing. */
-            .stop-notice {
-                display: flex;
-                align-items: flex-start;
-                gap: 6px;
-                margin-top: 8px;
-                padding: 6px 8px;
-                border-radius: 8px;
-                font-size: 13px;
-                line-height: 1.35;
-                color: var(--primary-text-color);
-                background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.12);
-            }
+                /* A notice for the whole stop, such as track works, stays readable in full: cut short it says nothing. */
+                .stop-notice {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 6px;
+                    margin-top: 8px;
+                    padding: 6px 8px;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    line-height: 1.35;
+                    color: var(--primary-text-color);
+                    background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.12);
+                }
 
-            .stop-notice ha-icon {
-                --mdc-icon-size: 16px;
-                flex: none;
-                width: 16px;
-                height: 16px;
-                margin-top: 1px;
-                color: var(--warning-color, #b45309);
-            }
+                .stop-notice ha-icon {
+                    --mdc-icon-size: 16px;
+                    flex: none;
+                    width: 16px;
+                    height: 16px;
+                    margin-top: 1px;
+                    color: var(--warning-color, #b45309);
+                }
 
-            /* A row's notice is a secondary text, cut short unless full_texts asks for it whole. */
-            .info .alert {
-                min-width: 0;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
+                /* A row's notice is a secondary text, cut short unless full_texts asks for it whole. */
+                .info .alert {
+                    min-width: 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
 
-            .full .info .alert {
-                white-space: normal;
-                overflow-wrap: anywhere;
-            }
+                .full .info .alert {
+                    white-space: normal;
+                    overflow-wrap: anywhere;
+                }
 
-            .attribution {
-                margin-top: 12px;
-                font-size: 11px;
-                text-align: right;
-            }
-        `;
+                .attribution {
+                    margin-top: 12px;
+                    font-size: 11px;
+                    text-align: right;
+                }
+
+                /*
+             * Held to a height, the card is a column whose title and attribution stay put. The stops share what is left
+             * as rows of their grid, each a column of its own whose heading, notices and next departure stay put while
+             * only its later departures scroll. A stop's measured minimum keeps those and one row in view.
+             */
+                ha-card.held {
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
+
+                .held .card-title,
+                .held .attribution {
+                    flex: none;
+                }
+
+                .held .sections {
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    overflow: hidden;
+                    align-content: start;
+                }
+
+                .held section {
+                    position: relative;
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    min-height: 0;
+                    overflow: hidden;
+                }
+
+                /* A stop without later departures has nothing to scroll and keeps its height. */
+                .held section:not(:has(> .rows)) {
+                    min-height: auto;
+                    overflow: visible;
+                }
+
+                .held section > * {
+                    flex: none;
+                }
+
+                .held .heading {
+                    align-self: flex-start;
+                }
+
+                /* Inside the card, as a held stop clips what is drawn outside it. */
+                .heading:focus-visible {
+                    outline: 2px solid var(--primary-color);
+                    outline-offset: -2px;
+                }
+
+                /* The top fade starts under the rows' own top border, so it doesn't erase it. */
+                .held section > .rows {
+                    --fade-top-offset: 1px;
+                    position: relative;
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    overflow-y: auto;
+                    overscroll-behavior: contain;
+                    scrollbar-width: thin;
+                }
+            `,
+      fadeStyles
+    ];
   }
 };
 __decorateClass([
   n4({ attribute: false })
 ], DeparturesCard.prototype, "hass", 2);
+__decorateClass([
+  n4({ attribute: false })
+], DeparturesCard.prototype, "layout", 2);
 __decorateClass([
   r5()
 ], DeparturesCard.prototype, "config", 2);

@@ -4,6 +4,7 @@ import "../src/departures-card";
 import type { DeparturesCard } from "../src/departures-card";
 import { compactSections, formData } from "../src/editor";
 import type { HomeAssistant } from "../src/hass";
+import { browserLanguage, translate } from "../src/localize/localize";
 import type { Departure, DeparturesCardConfig } from "../src/types";
 
 const NOW = Date.parse("2026-10-04T13:52:00Z");
@@ -41,8 +42,9 @@ function hass(departures: Record<string, Departure[] | "unavailable">): HomeAssi
     };
 }
 
-async function card(state: HomeAssistant, config: Partial<DeparturesCardConfig>): Promise<DeparturesCard> {
+async function card(state: HomeAssistant, config: Partial<DeparturesCardConfig>, layout?: string): Promise<DeparturesCard> {
     const element = document.createElement("departures-card");
+    element.layout = layout;
     element.setConfig({ type: "custom:departures-card", entities: ["sensor.kauppatori"], ...config } as DeparturesCardConfig);
     element.hass = state;
     document.body.append(element);
@@ -98,18 +100,21 @@ describe("departures-card", () => {
         const observers: FakeResizeObserver[] = [];
         class FakeResizeObserver {
             public targets = new Set<Element>();
-            public constructor(private readonly callback: () => void) {
+            public constructor(private readonly callback: (entries: Array<{ target: Element }>) => void) {
                 observers.push(this);
             }
             public observe(target: Element): void {
                 this.targets.add(target);
+            }
+            public unobserve(target: Element): void {
+                this.targets.delete(target);
             }
             public disconnect(): void {
                 this.targets.clear();
             }
             public fire(): void {
                 if (this.targets.size) {
-                    this.callback();
+                    this.callback([...this.targets].map((target) => ({ target })));
                 }
             }
         }
@@ -270,11 +275,10 @@ describe("departures-card", () => {
                 await element.updateComplete;
                 await nextFrame();
             }
-            // One observer for the card's whole life, not one per visit.
-            expect(observers).toHaveLength(1);
-            const watching = observers.filter((observer) => observer.targets.size > 0);
-            expect(watching).toHaveLength(1);
-            expect([...watching[0].targets]).toContain(element.shadowRoot!.querySelector("ha-card"));
+            // One observer for the card's size and one for its fades, each for the card's whole life, not one per visit.
+            expect(observers).toHaveLength(2);
+            const haCard = element.shadowRoot!.querySelector("ha-card")!;
+            expect(observers.filter((observer) => observer.targets.has(haCard))).toHaveLength(1);
         });
 
         it("doesn't start watching again from an update that was queued as it left", async () => {
@@ -371,7 +375,7 @@ describe("departures-card", () => {
         expect(cut.shadowRoot!.querySelector("ha-card")?.classList.contains("full")).toBe(false);
         const full = await card(state, { entities: [{ entity: "sensor.kauppatori", subtitle: "keskustaan" }], full_texts: true });
         expect(full.shadowRoot!.querySelector("ha-card")?.classList.contains("full")).toBe(true);
-        expect(full.getGridOptions()).toEqual({ columns: 12, min_columns: 6, rows: "auto" });
+        expect(full.getGridOptions()).toEqual({ columns: 12, min_columns: 6, rows: "auto", min_rows: 4 });
     });
 
     it("brings its countdowns up to date when it comes back onto the page", async () => {
@@ -382,6 +386,271 @@ describe("departures-card", () => {
         document.body.append(element);
         await element.updateComplete;
         expect(text(element.shadowRoot!.querySelector(".countdown"))).toBe("4 min");
+    });
+});
+
+describe("the card's height", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.useRealTimers();
+        document.body.innerHTML = "";
+    });
+
+    it.each([
+        ["its content", undefined, {}, ""],
+        ["a fixed height", undefined, { height: 300 }, "height: 300px"],
+        ["a maximum height", undefined, { max_height: 400 }, "max-height: 400px"],
+        [
+            "the mode chosen over the heights it has",
+            undefined,
+            { height_mode: "max" as const, height: 300, max_height: 400 },
+            "max-height: 400px",
+        ],
+        ["grid rows in a sections view", "grid", { height: 300, grid_options: { rows: 6 } }, "height: 100%"],
+        ["the mode when the grid rows are automatic", "grid", { max_height: 400, grid_options: { rows: "auto" } }, "max-height: 400px"],
+    ])("sizes itself by %s", async (_name, layout, extra, style) => {
+        const element = await card(hass({ "sensor.kauppatori": [departure("a", 11)] }), extra, layout);
+        expect(element.shadowRoot!.querySelector("ha-card")?.getAttribute("style") ?? "").toBe(style);
+    });
+
+    it.each([
+        ["one stop", {}, 187, 4],
+        ["a title", { title: "Lähdöt" }, 228, 4],
+        ["only the next departure", { departures: 1 }, 138, 3],
+        ["two stops", { entities: ["sensor.kauppatori", "sensor.works"] }, 342, 6],
+        ["two stops in one list", { entities: ["sensor.kauppatori", "sensor.works"], combine: true }, 187, 4],
+    ])("is never held lower than the next departure and one row of every stop need, with %s", async (_name, extra, minimum, rows) => {
+        const state = hass({ "sensor.kauppatori": [departure("a", 11)], "sensor.works": [departure("b", 12)] });
+        const element = await card(state, { ...extra, height: 100 });
+        expect(element.getGridOptions()).toMatchObject({ rows: "auto", min_rows: rows });
+        expect(element.shadowRoot!.querySelector("ha-card")?.getAttribute("style")).toBe(`height: ${minimum}px`);
+    });
+
+    it("puts each stop's heading, notices, next departure and later rows in that order, and is held only with a height", async () => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+        const state = hass({
+            "sensor.kauppatori": [departure("a", 11), departure("b", 20)],
+            "sensor.works": [departure("c", 12), departure("d", 25)],
+        });
+        const config = { title: "Lähdöt", entities: ["sensor.kauppatori", "sensor.works"] };
+        const held = (await card(state, { ...config, height: 400 })).shadowRoot!.querySelector("ha-card")!;
+        expect(held.classList.contains("held")).toBe(true);
+        expect([...held.children].map((child) => child.className)).toEqual(["card-title", "sections", "attribution"]);
+        const sections = [...held.querySelectorAll(".sections > section")];
+        expect(sections.map((section) => [...section.children].map((child) => child.classList[0]))).toEqual([
+            ["heading", "next", "rows"],
+            ["heading", "stop-notice", "next", "rows"],
+        ]);
+        expect(sections.every((section) => section.querySelector(".rows > .row"))).toBe(true);
+        const auto = (await card(state, config)).shadowRoot!.querySelector("ha-card")!;
+        expect(auto.classList.contains("held")).toBe(false);
+    });
+
+    it.each([
+        ["held to a height", undefined, { height: 400 }, ["fade-bottom"]],
+        ["held up to a limit", undefined, { max_height: 400 }, ["fade-bottom"]],
+        ["held by rows in a sections view", "grid", { grid_options: { rows: 4 } }, ["fade-bottom"]],
+        [
+            "held to a height with automatic rows in a sections view",
+            "grid",
+            { height: 400, grid_options: { rows: "auto" } },
+            ["fade-bottom"],
+        ],
+        ["held by the older layout options' rows in a sections view", "grid", { layout_options: { grid_rows: 4 } }, ["fade-bottom"]],
+        ["never in auto", undefined, {}, []],
+        ["never in auto with automatic rows in a sections view", "grid", { grid_options: { rows: "auto" } }, []],
+        ["never by grid rows outside a sections view", undefined, { grid_options: { rows: 4 } }, []],
+    ])("fades the bottom edge of a stop's later departures that run past it when %s", async (_name, layout, extra, expected) => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+        const state = hass({ "sensor.kauppatori": [departure("a", 11), departure("b", 20), departure("c", 25)] });
+        const element = await card(state, extra, layout);
+        const rows = element.shadowRoot!.querySelector("section > .rows") as HTMLElement;
+        Object.defineProperty(rows, "scrollHeight", { value: 600, configurable: true });
+        Object.defineProperty(rows, "clientHeight", { value: 200, configurable: true });
+        element.requestUpdate();
+        await element.updateComplete;
+        expect(["fade-top", "fade-bottom"].filter((name) => rows.classList.contains(name))).toEqual(expected);
+    });
+
+    it("lets go of a stop's fade when the card goes from held to auto, and fades it again when held again", async () => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+        const state = hass({ "sensor.kauppatori": [departure("a", 11), departure("b", 20), departure("c", 25)] });
+        const element = await card(state, { height: 400 });
+        const rows = element.shadowRoot!.querySelector("section > .rows") as HTMLElement;
+        Object.defineProperty(rows, "scrollHeight", { value: 600, configurable: true });
+        Object.defineProperty(rows, "clientHeight", { value: 200, configurable: true });
+        element.requestUpdate();
+        await element.updateComplete;
+        expect([...rows.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
+        element.setConfig({ type: "custom:departures-card", entities: ["sensor.kauppatori"] } as DeparturesCardConfig);
+        await element.updateComplete;
+        expect([...rows.classList].filter((name) => name.startsWith("fade"))).toEqual([]);
+        element.setConfig({ type: "custom:departures-card", entities: ["sensor.kauppatori"], height: 400 } as DeparturesCardConfig);
+        await element.updateComplete;
+        expect([...rows.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
+    });
+
+    it("keeps a held stop's fade when its last row moves to another day and the rows take the day column", async () => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+        const element = await card(hass({ "sensor.kauppatori": [departure("a", 11), departure("b", 20), departure("c", 25)] }), {
+            height: 400,
+        });
+        const rows = element.shadowRoot!.querySelector("section > .rows") as HTMLElement;
+        Object.defineProperty(rows, "scrollHeight", { value: 600, configurable: true });
+        Object.defineProperty(rows, "clientHeight", { value: 200, configurable: true });
+        element.requestUpdate();
+        await element.updateComplete;
+        expect(rows.classList.contains("with-days")).toBe(false);
+        expect([...rows.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
+        element.hass = hass({ "sensor.kauppatori": [departure("a", 11), departure("b", 20), departure("c", 10 * 60)] });
+        await element.updateComplete;
+        expect(element.shadowRoot!.querySelector("section > .rows")).toBe(rows);
+        expect(rows.classList.contains("with-days")).toBe(true);
+        expect([...rows.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
+    });
+
+    it("is held by its rows in a sections view and let go out of it, even when an unrelated state change comes with it", async () => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+        vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+            callback(0);
+            return 0;
+        });
+        const state = hass({ "sensor.kauppatori": [departure("a", 11), departure("b", 20)] });
+        const element = await card(state, { grid_options: { rows: 4 } });
+        const root = element.shadowRoot!;
+        // The sizes a browser would lay out, which happy-dom doesn't.
+        const layOut = () => {
+            const section = root.querySelector(".sections > section")!;
+            Object.defineProperty(section, "clientTop", { value: 1, configurable: true });
+            Object.defineProperty(section.querySelector(":scope > .rows"), "offsetTop", { value: 90, configurable: true });
+            Object.defineProperty(section.querySelector(":scope > .rows"), "clientTop", { value: 0, configurable: true });
+            Object.defineProperty(section.querySelector(".rows > .row"), "offsetTop", { value: 4, configurable: true });
+            Object.defineProperty(section.querySelector(".rows > .row"), "offsetHeight", { value: 45, configurable: true });
+        };
+        const minimums = () => [...root.querySelectorAll<HTMLElement>(".sections > section")].map((section) => section.style.minHeight);
+        let changes = 0;
+        // A state change elsewhere in Home Assistant, which on its own wouldn't redraw the card.
+        const elsewhere = () => {
+            const other = { entity_id: "sensor.elsewhere", state: String(++changes), last_changed: "2026-10-04", attributes: {} };
+            element.hass = { ...state, states: { ...state.states, "sensor.elsewhere": other } };
+        };
+        layOut();
+        expect(root.querySelector("ha-card")?.classList.contains("held")).toBe(false);
+
+        element.layout = "grid";
+        elsewhere();
+        await element.updateComplete;
+        expect(root.querySelector("ha-card")?.classList.contains("held")).toBe(true);
+        expect(root.querySelector("ha-card")?.getAttribute("style")).toBe("height: 100%");
+        expect(minimums()).toEqual(["140px"]);
+
+        element.layout = "masonry";
+        elsewhere();
+        await element.updateComplete;
+        expect(root.querySelector("ha-card")?.classList.contains("held")).toBe(false);
+        expect(root.querySelector("ha-card")?.getAttribute("style") ?? "").toBe("");
+        expect(minimums()).toEqual([""]);
+    });
+
+    it("refuses a height that isn't a positive number of pixels, and an unknown height mode, with an error about the height", () => {
+        const element = document.createElement("departures-card");
+        const config = (extra: Record<string, unknown>) =>
+            ({ type: "custom:departures-card", entities: ["sensor.kauppatori"], ...extra }) as never;
+        const error = translate(browserLanguage(), "common.invalid_height");
+        expect(error).toMatch(/^Invalid height\./);
+        for (const value of ["300px", 0, -10]) {
+            expect(() => element.setConfig(config({ max_height: value }))).toThrow(error);
+            expect(() => element.setConfig(config({ height: value }))).toThrow(error);
+        }
+        expect(() => element.setConfig(config({ height_mode: "tall" }))).toThrow(error);
+        // Left empty in YAML, each is unset.
+        expect(() => element.setConfig(config({ height_mode: null, height: null, max_height: null }))).not.toThrow();
+        // The card's own count is checked first.
+        expect(() => element.setConfig(config({ departures: 0, height: 0 }))).toThrow(
+            translate(browserLanguage(), "common.invalid_departures"),
+        );
+    });
+
+    it("keeps a held stop's next departure and first later row in view, and only a stop that has later rows", async () => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+        vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+            callback(0);
+            return 0;
+        });
+        const state = hass({
+            "sensor.kauppatori": [departure("a", 11), departure("b", 20)],
+            "sensor.works": [departure("c", 12)],
+            "sensor.gone": "unavailable",
+        });
+        const entities = ["sensor.kauppatori", "sensor.works", "sensor.gone"];
+        const element = await card(state, { entities, height: 600 });
+        const root = element.shadowRoot!;
+        const sections = () => [...root.querySelectorAll<HTMLElement>(".sections > section")];
+        // The sizes a browser would lay out, which happy-dom doesn't.
+        const stub = (target: Element | null, sizes: Record<string, number>) => {
+            for (const [name, value] of Object.entries(sizes)) {
+                if (target) {
+                    Object.defineProperty(target, name, { value, configurable: true });
+                }
+            }
+        };
+        const layOut = () => {
+            for (const section of sections()) {
+                stub(section, { clientTop: 1 });
+                stub(section.querySelector(":scope > .rows"), { offsetTop: 90, clientTop: 0 });
+                stub(section.querySelector(".rows > .row"), { offsetTop: 4, offsetHeight: 45 });
+            }
+        };
+        const minimums = () => sections().map((section) => section.style.minHeight);
+        const configure = async (extra: Partial<DeparturesCardConfig>) => {
+            element.setConfig({ type: "custom:departures-card", entities, ...extra } as DeparturesCardConfig);
+            await element.updateComplete;
+            layOut();
+            element.requestUpdate();
+            await element.updateComplete;
+        };
+        layOut();
+        element.requestUpdate();
+        await element.updateComplete;
+        expect(minimums()).toEqual(["140px", "", ""]);
+        const first = sections();
+
+        await configure({});
+        expect(root.querySelector("ha-card")?.classList.contains("held")).toBe(false);
+        expect(sections()).toEqual(first);
+        expect(minimums()).toEqual(["", "", ""]);
+
+        // Held again, its minimum comes back.
+        await configure({ height: 600 });
+        expect(minimums()).toEqual(["140px", "", ""]);
+
+        // Still held, a stop whose later departures have gone has nothing to keep in view.
+        element.hass = hass({
+            "sensor.kauppatori": [departure("a", 11)],
+            "sensor.works": [departure("c", 12)],
+            "sensor.gone": "unavailable",
+        });
+        await element.updateComplete;
+        expect(root.querySelector("ha-card")?.classList.contains("held")).toBe(true);
+        expect(sections()[0].querySelector(".rows")).toBeNull();
+        expect(minimums()).toEqual(["", "", ""]);
+
+        // Still held, a stop that gains later departures is kept in view from then on.
+        element.hass = hass({
+            "sensor.kauppatori": [departure("a", 11)],
+            "sensor.works": [departure("c", 12), departure("d", 25)],
+            "sensor.gone": "unavailable",
+        });
+        await element.updateComplete;
+        layOut();
+        element.requestUpdate();
+        await element.updateComplete;
+        expect(minimums()).toEqual(["", "140px", ""]);
+
+        // Combined, the one list of every stop's departures is kept in view as a stop's is.
+        element.hass = state;
+        await configure({ height: 600, combine: true });
+        expect(minimums()).toEqual(["140px"]);
     });
 });
 
