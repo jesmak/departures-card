@@ -686,3 +686,35 @@ describe("the editor", () => {
         expect(formData({ type: "custom:departures-card", entities: "sensor.a" } as never).entities).toEqual([{ entity: "sensor.a" }]);
     });
 });
+
+describe("redrawing for a new hass", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        document.body.innerHTML = "";
+    });
+
+    // Home Assistant hands the card every change in the house. Its own sensors, the language and the locale (the time
+    // format and time zone with it) are what change what the card shows.
+    it.each<[string, (state: HomeAssistant) => HomeAssistant, number]>([
+        [
+            "another entity's change",
+            (state) => ({
+                ...state,
+                states: {
+                    ...state.states,
+                    "sensor.elsewhere": { entity_id: "sensor.elsewhere", state: "2", last_changed: "", attributes: {} },
+                },
+            }),
+            0,
+        ],
+        ["a new language", (state) => ({ ...state, locale: { ...state.locale!, language: "en" }, language: "en" }), 1],
+        ["a new locale alone, as a new time zone", (state) => ({ ...state, locale: { ...state.locale!, time_zone: "local" } }), 1],
+        ["a new language in the older field alone", (state) => ({ ...state, language: "sv" }), 1],
+    ])("redraws as it should for %s", async (_name, change, renders) => {
+        const element = await card(hass({ "sensor.kauppatori": [departure("a", 5)] }), {});
+        const render = vi.spyOn(element as unknown as { render(): unknown }, "render");
+        element.hass = change(element.hass!);
+        await element.updateComplete;
+        expect(render).toHaveBeenCalledTimes(renders);
+    });
+});

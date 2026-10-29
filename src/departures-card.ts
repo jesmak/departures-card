@@ -225,8 +225,13 @@ export class DeparturesCard extends LitElement {
         if (changed.has("config") || changed.has("layout") || !this.config || !changed.has("hass") || !previous) {
             return true;
         }
-        // Home Assistant hands the card every state change in the house; only its own sensors matter.
-        return sectionsOf(this.config.entities).some(({ entity }) => previous.states[entity] !== this.hass?.states[entity]);
+        // Home Assistant hands the card every state change in the house; only its own sensors, the language and the locale
+        // (the time zone with it) matter.
+        return (
+            previous.locale !== this.hass?.locale ||
+            previous.language !== this.hass?.language ||
+            sectionsOf(this.config.entities).some(({ entity }) => previous.states[entity] !== this.hass?.states[entity])
+        );
     }
 
     protected render(): TemplateResult | typeof nothing {

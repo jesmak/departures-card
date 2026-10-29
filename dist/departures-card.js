@@ -1426,7 +1426,7 @@ var DeparturesCard = class extends i4 {
     if (changed.has("config") || changed.has("layout") || !this.config || !changed.has("hass") || !previous) {
       return true;
     }
-    return sectionsOf(this.config.entities).some(({ entity }) => previous.states[entity] !== this.hass?.states[entity]);
+    return previous.locale !== this.hass?.locale || previous.language !== this.hass?.language || sectionsOf(this.config.entities).some(({ entity }) => previous.states[entity] !== this.hass?.states[entity]);
   }
   render() {
     if (!this.hass || !this.config) {
