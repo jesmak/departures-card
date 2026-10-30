@@ -41,7 +41,7 @@
         "show_notices": "Näytä tiedotteet",
         "show_notices_helper": "Ratatyöt ja muut koko pysäkkiä koskevat tiedotteet sen nimen alla",
         "full_texts": "Näytä tekstit kokonaan",
-        "full_texts_helper": "Alaotsikko ja myöhempien lähtöjen tiedotteet rivitetään lyhentämisen sijaan",
+        "full_texts_helper": "Alaotsikko ja tiedotteet rivitetään lyhentämisen sijaan",
         "combine": "Näytä yhtenä listana",
         "combine_helper": "Kaikkien pysäkkien lähdöt ja saapumiset yhdessä listassa aikajärjestyksessä",
         "height_mode": "Korkeus",

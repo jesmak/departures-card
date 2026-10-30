@@ -935,7 +935,7 @@ var en_default = {
     show_notices: "Show notices",
     show_notices_helper: "Track works and other notices for the whole stop, under its name",
     full_texts: "Show texts in full",
-    full_texts_helper: "The subtitle and the notices of later departures wrap instead of being cut short",
+    full_texts_helper: "The subtitle and the notices wrap instead of being cut short",
     combine: "Show as one list",
     combine_helper: "Every stop's departures and arrivals in one list in time order",
     height_mode: "Height",
@@ -994,7 +994,7 @@ var fi_default = {
     show_notices: "N\xE4yt\xE4 tiedotteet",
     show_notices_helper: "Rataty\xF6t ja muut koko pys\xE4kki\xE4 koskevat tiedotteet sen nimen alla",
     full_texts: "N\xE4yt\xE4 tekstit kokonaan",
-    full_texts_helper: "Alaotsikko ja my\xF6hempien l\xE4ht\xF6jen tiedotteet rivitet\xE4\xE4n lyhent\xE4misen sijaan",
+    full_texts_helper: "Alaotsikko ja tiedotteet rivitet\xE4\xE4n lyhent\xE4misen sijaan",
     combine: "N\xE4yt\xE4 yhten\xE4 listana",
     combine_helper: "Kaikkien pys\xE4kkien l\xE4hd\xF6t ja saapumiset yhdess\xE4 listassa aikaj\xE4rjestyksess\xE4",
     height_mode: "Korkeus",
@@ -1527,7 +1527,9 @@ var DeparturesCard = class extends i4 {
             <section>
                 ${heading}
                 ${notices.map(
-      (notice) => b2`<div class="stop-notice"><ha-icon icon="mdi:alert-outline"></ha-icon><span>${notice}</span></div>`
+      (notice) => b2`<div class="stop-notice" title="${notice}">
+                            <ha-icon icon="mdi:alert-outline"></ha-icon><span>${notice}</span>
+                        </div>`
     )}
                 ${next ? this.next(next) : A}
                 ${rest.length ? b2`<div
@@ -2025,18 +2027,31 @@ var DeparturesCard = class extends i4 {
                     font-size: 13px;
                 }
 
-                /* A notice for the whole stop, such as track works, stays readable in full: cut short it says nothing. */
+                /* A notice for the whole stop, such as track works, takes one line, 32 px with its margin, cut short unless
+                   full_texts asks for it whole. Its tooltip has it in full. */
                 .stop-notice {
                     display: flex;
                     align-items: flex-start;
                     gap: 6px;
-                    margin-top: 8px;
-                    padding: 6px 8px;
+                    margin-top: 4px;
+                    padding: 4px 8px;
                     border-radius: 8px;
                     font-size: 13px;
-                    line-height: 1.35;
+                    line-height: 20px;
                     color: var(--primary-text-color);
                     background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.12);
+                }
+
+                .stop-notice span {
+                    min-width: 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .full .stop-notice span {
+                    white-space: normal;
+                    overflow-wrap: anywhere;
                 }
 
                 .stop-notice ha-icon {
@@ -2044,7 +2059,7 @@ var DeparturesCard = class extends i4 {
                     flex: none;
                     width: 16px;
                     height: 16px;
-                    margin-top: 1px;
+                    margin-top: 2px;
                     color: var(--warning-color, #b45309);
                 }
 
