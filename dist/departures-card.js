@@ -759,27 +759,14 @@ function visibleDepartures(departures, now, count, showCancelled) {
     (departure) => Date.parse(departure.estimated) >= now - (departure.direction === "arrivals" ? ARRIVED_KEPT_MS : GONE_AFTER_MS)
   ).filter((departure) => showCancelled || !departure.cancelled).sort((a3, b3) => Date.parse(a3.estimated) - Date.parse(b3.estimated));
   const over = (departure) => departure.direction === "arrivals" && (departure.cancelled ? Date.parse(departure.estimated) < now : !!departure.arrived);
-  const arrived = upcoming.filter(over).slice(-ARRIVED_ROWS);
   const coming = upcoming.filter((departure) => !over(departure));
-  const listed = counted(coming, count);
-  const next = listed.find((departure) => !departure.cancelled);
-  const rest = [...arrived, ...listed.filter((departure) => departure !== next)].sort(
-    (a3, b3) => Date.parse(a3.estimated) - Date.parse(b3.estimated)
-  );
+  const next = coming.find((departure) => !departure.cancelled);
+  const rows = Math.max(0, next ? count - 1 : count);
+  const overs = upcoming.filter(over);
+  const arrived = overs.slice(overs.length - Math.min(ARRIVED_ROWS, rows, overs.length));
+  const listed = coming.filter((departure) => departure !== next).slice(0, rows - arrived.length);
+  const rest = [...arrived, ...listed].sort((a3, b3) => Date.parse(a3.estimated) - Date.parse(b3.estimated));
   return { next, rest };
-}
-function counted(departures, count) {
-  let last = -1;
-  let counting = 0;
-  for (const [index, departure] of departures.entries()) {
-    if (counting >= count) break;
-    if (!departure.cancelled) {
-      last = index;
-      counting++;
-    }
-  }
-  const listed = departures.slice(0, last + 1);
-  return counting >= count ? listed : [...listed, ...departures.slice(last + 1, count)];
 }
 function isDeparture(value) {
   const departure = value;
@@ -930,12 +917,12 @@ var en_default = {
     subtitle: "Subtitle",
     subtitle_helper: "Such as the direction, towards the centre. Not used in one list.",
     departures: "Departures shown",
-    departures_helper: "Per stop, or in the whole list when the stops are one list. Cancelled departures among them show too, and the arrivals list also shows at most the latest two that have come in or were cancelled.",
+    departures_helper: "Per stop, or in the whole list when the stops are one list, cancelled ones included. On the arrivals list they include at most the latest two that have come in or were cancelled.",
     show_cancelled: "Show cancelled departures",
     show_notices: "Show notices",
     show_notices_helper: "Track works and other notices for the whole stop, under its name",
     full_texts: "Show texts in full",
-    full_texts_helper: "The subtitle and the notices wrap instead of being cut short",
+    full_texts_helper: "The subtitle, the notices and a narrow card's destinations wrap instead of being cut short",
     combine: "Show as one list",
     combine_helper: "Every stop's departures and arrivals in one list in time order",
     height_mode: "Height",
@@ -989,12 +976,12 @@ var fi_default = {
     subtitle: "Alaotsikko",
     subtitle_helper: "Esimerkiksi suunta, keskustaan p\xE4in. Ei k\xE4yt\xF6ss\xE4 yhten\xE4 listana.",
     departures: "N\xE4ytett\xE4vi\xE4 l\xE4ht\xF6j\xE4",
-    departures_helper: "Pys\xE4kki\xE4 kohden, tai koko listassa, kun pys\xE4kit ovat yhten\xE4 listana. Perutut vuorot niiden v\xE4liss\xE4 n\xE4kyv\xE4t lis\xE4ksi, ja saapuvien listalla n\xE4ytet\xE4\xE4n enint\xE4\xE4n kaksi viimeisint\xE4 saapunutta tai peruttua.",
+    departures_helper: "Pys\xE4kki\xE4 kohden, tai koko listassa, kun pys\xE4kit ovat yhten\xE4 listana, perutut vuorot mukaan lukien. Saapuvien listalla niihin kuuluu enint\xE4\xE4n kaksi viimeisint\xE4 saapunutta tai peruttua.",
     show_cancelled: "N\xE4yt\xE4 perutut l\xE4hd\xF6t",
     show_notices: "N\xE4yt\xE4 tiedotteet",
     show_notices_helper: "Rataty\xF6t ja muut koko pys\xE4kki\xE4 koskevat tiedotteet sen nimen alla",
     full_texts: "N\xE4yt\xE4 tekstit kokonaan",
-    full_texts_helper: "Alaotsikko ja tiedotteet rivitet\xE4\xE4n lyhent\xE4misen sijaan",
+    full_texts_helper: "Alaotsikko, tiedotteet ja kapean kortin m\xE4\xE4r\xE4np\xE4\xE4t rivitet\xE4\xE4n lyhent\xE4misen sijaan",
     combine: "N\xE4yt\xE4 yhten\xE4 listana",
     combine_helper: "Kaikkien pys\xE4kkien l\xE4hd\xF6t ja saapumiset yhdess\xE4 listassa aikaj\xE4rjestyksess\xE4",
     height_mode: "Korkeus",
@@ -1328,13 +1315,10 @@ var DeparturesCard = class extends i4 {
   get combines() {
     return !!this.config?.combine && new Set(sectionsOf(this.config.entities).map((section) => section.entity)).size > 1;
   }
-  /** A list with arrivals can be two rows longer than its count, for the ones that are over. Cancelled ones lengthen any
-   * list too, which the size can't know before it has the departures. */
   getCardSize() {
     const rows = this.config?.departures ?? DEFAULT_DEPARTURES;
     const entities = this.config ? sectionsOf(this.config.entities).map((section) => section.entity) : [];
-    const list = (ids) => 2 + rows + (ids.some((id) => statedDirection(this.hass?.states[id]) === "arrivals") ? ARRIVED_ROWS : 0);
-    const content = 1 + (!this.config || this.combines ? list(entities) : entities.reduce((size, id) => size + list([id]), 0));
+    const content = 1 + (2 + rows) * (!this.config || this.combines ? 1 : entities.length);
     return heightCardSize(this.config ?? {}, content, this.minimumHeight());
   }
   /** In a sections view the card takes a whole section by default and is never narrower than half of one. */
@@ -1380,7 +1364,18 @@ var DeparturesCard = class extends i4 {
     if (card) {
       this.resizes.observe(card);
     }
+    this.markScrolling();
     this.alignBadgesSoon();
+  }
+  /**
+   * Marks the later departures that run past their height, which gives them room from the scrollbar. Worked out after
+   * every render and change in size, not while they scroll, so the room can't come and go with the scrolling. The room
+   * only makes the rows narrower, so it never takes away the overflow that brought it.
+   */
+  markScrolling() {
+    for (const rows of this.renderRoot.querySelectorAll("ha-card.held section > .rows")) {
+      rows.classList.toggle("scrolls", rows.scrollHeight - rows.clientHeight > 1);
+    }
   }
   /**
    * A stop's later departures get badges as wide as its widest, so their destinations line up, as line names such as
@@ -1394,6 +1389,7 @@ var DeparturesCard = class extends i4 {
     this.frame = requestAnimationFrame(() => {
       this.alignBadges();
       this.keepNextDepartures();
+      this.markScrolling();
     });
   }
   /**
@@ -1578,24 +1574,25 @@ var DeparturesCard = class extends i4 {
     const delay = delayMinutes(departure);
     let info;
     if (cancelled) {
-      info = b2`<span class="alert" title="${departure.notice ?? ""}"
-                >${[this.text("common.cancelled"), departure.notice].filter(Boolean).join(", ")}</span
-            >`;
-    } else if (arrived) {
-      info = b2`${this.delay(delay)}
-                <span class="arrived">${this.text(departure.mode === "plane" ? "common.landed" : "common.arrived")}</span>
-                ${departure.notice ? b2`<span class="alert" title="${departure.notice}">${departure.notice}</span>` : A}
-                ${this.platform(departure)}`;
+      const text = [this.text("common.cancelled"), departure.notice].filter(Boolean).join(", ");
+      info = b2`<span class="status" title="${text}"><span class="alert">${text}</span></span>`;
     } else {
+      const landed = arrived ? this.text(departure.mode === "plane" ? "common.landed" : "common.arrived") : "";
+      const text = [landed, departure.notice].filter(Boolean).join(", ");
       info = b2`${this.delay(delay)}
-            ${departure.notice ? b2`<span class="alert" title="${departure.notice}">${departure.notice}</span>` : A}
+            ${text ? b2`<span class="status" title="${text}"
+                          >${landed ? b2`<span class="arrived">${landed}</span>` : A}
+                          ${departure.notice ? b2`<span class="alert">${departure.notice}</span>` : A}</span
+                      >` : A}
             ${this.platform(departure)}`;
     }
     return b2`
             <div class="row ${cancelled ? "cancelled" : ""} ${arrived ? "came-in" : ""}">
                 <span class="time ${cancelled ? "struck" : ""}">${this.when(cancelled ? departure.scheduled : departure.estimated)}</span>
                 ${this.badge(departure, "small")}
-                <span class="headsign">${icon ? this.directionIcon(departure) : A}${departure.headsign ?? ""}</span>
+                <span class="headsign" title="${departure.headsign ?? ""}"
+                    >${icon ? this.directionIcon(departure) : A}${departure.headsign ?? ""}</span
+                >
                 <span class="info">${info}</span>
             </div>
         `;
@@ -1823,7 +1820,6 @@ var DeparturesCard = class extends i4 {
                 /* The departure's own notice ends the line and is cut short, so the next departure is always two lines high. */
                 .meta {
                     display: flex;
-                    flex-wrap: wrap;
                     align-items: center;
                     gap: 4px 6px;
                     font-size: 13px;
@@ -1917,8 +1913,10 @@ var DeparturesCard = class extends i4 {
                     white-space: nowrap;
                 }
 
-                /* The day in front of a time that isn't today: quieter than the time, but there. */
+                /* The day in front of a time that isn't today: quieter than the time, but there. Its own line height, so the
+                   smaller text doesn't make its row taller. */
                 .day {
+                    line-height: 1;
                     font-size: 0.75em;
                     font-weight: var(--ha-font-weight-medium, 500);
                     color: var(--secondary-text-color);
@@ -1928,10 +1926,9 @@ var DeparturesCard = class extends i4 {
                     min-width: 72px;
                 }
 
-                /* Below 80 px the destination takes the next line, or a short one such as Pasila would sit squeezed between them.
-                   Half a section leaves it 99 px beside a time and a short line's badge. */
+                /* Below 100 px the destination takes the next line, or a short one such as Pasila would sit squeezed between them. */
                 .row .headsign {
-                    flex: 1 1 80px;
+                    flex: 1 1 100px;
                     min-width: 0;
                 }
 
@@ -1945,6 +1942,91 @@ var DeparturesCard = class extends i4 {
                     align-items: center;
                     gap: 2px 6px;
                     font-size: 12px;
+                }
+
+                /* What a row says in words: that it has come in, or its notice. Cut short as one, with the whole in its tooltip. */
+                .status {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 2px 6px;
+                    min-width: 0;
+                }
+
+                .full .status {
+                    flex-wrap: wrap;
+                }
+
+                /*
+                 * On a narrow card every later departure takes two lines, 64 px, whatever it shows: its time, line and what it
+                 * says in words on the first, and its destination with its delay and track under them. The words and the
+                 * destination are cut short unless full_texts asks for them whole, as the numbers never are. A delay or a long
+                 * destination would otherwise make some rows taller than others as the data changes.
+                 */
+                /* The info box gives up its parts to the row, and an empty item as wide as the row breaks it into its two lines,
+                   each with the row's whole width. */
+                @container (max-width: 399px) {
+                    .row {
+                        gap: 0 6px;
+                        padding: 10px 0;
+                    }
+
+                    .row::after {
+                        content: "";
+                        order: 4;
+                        flex-basis: 100%;
+                    }
+
+                    .row .info {
+                        display: contents;
+                    }
+
+                    .row .time {
+                        order: 1;
+                        margin-right: 4px;
+                    }
+
+                    .row .badge {
+                        order: 2;
+                        margin-right: 4px;
+                    }
+
+                    .row .status {
+                        order: 3;
+                        flex: 1 1 0;
+                        justify-content: flex-end;
+                    }
+
+                    .row .status .alert,
+                    .row .status .arrived {
+                        min-width: 0;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+
+                    .row .headsign {
+                        order: 5;
+                        flex: 1 1 0;
+                        margin-top: 4px;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+
+                    .row :is(.late, .early) {
+                        order: 6;
+                        margin-top: 4px;
+                    }
+
+                    .row .platform {
+                        order: 7;
+                        margin-top: 4px;
+                    }
+
+                    .full .row .headsign,
+                    .full .row .status .alert {
+                        white-space: normal;
+                    }
                 }
 
                 /* Numbers stay whole: a track cut short is another track. */
@@ -2148,7 +2230,7 @@ var DeparturesCard = class extends i4 {
                 }
 
                 /* Room between the rows and the scrollbar, only while there is something to scroll. */
-                .held section > .rows:is(.fade-top, .fade-bottom) {
+                .held section > .rows.scrolls {
                     padding-right: 8px;
                 }
             `,

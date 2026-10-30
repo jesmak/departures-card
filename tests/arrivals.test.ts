@@ -202,12 +202,12 @@ describe("arrivals and directions", () => {
         expect(text(row)).toBe("11.48 AY5 Oulu +13 min Laskeutunut Matkatavarat myöhässä Aula 2A");
     });
 
-    it("lists only the two latest that have landed, besides the count", async () => {
+    it("lists only the two latest that have landed, within the count", async () => {
         const landed = [-25, -20, -15, -10].map((minutes, index) => flight(`ay${index}`, minutes, { arrived: true }));
         const state = hass({ "sensor.saapuvat": { departures: [...landed, flight("ay8", 5), flight("ay9", 15)], direction: "arrivals" } });
         const root = (await card(state, { entities: ["sensor.saapuvat"], departures: 3 })).shadowRoot!;
         expect(text(root.querySelector(".next .badge"))).toBe("AY8");
-        expect([...root.querySelectorAll(".row .badge")].map(text)).toEqual(["AY2", "AY3", "AY9"]);
+        expect([...root.querySelectorAll(".row .badge")].map(text)).toEqual(["AY2", "AY3"]);
     });
 
     it("lists the two latest over of the whole list, a cancelled one among them as cancelled, not landed", async () => {
@@ -392,18 +392,18 @@ describe("arrivals and directions", () => {
         );
     });
 
-    it("has room for the two that are over when it shows arrivals", () => {
+    it("is as tall for arrivals as for departures, as the ones that are over are counted", () => {
         const element = document.createElement("departures-card");
         element.hass = hass({ "sensor.lahtevat": DEPARTURES, "sensor.saapuvat": ARRIVALS });
         element.setConfig({ type: "custom:departures-card", entities: ["sensor.lahtevat", "sensor.saapuvat"], departures: 4 });
-        expect(element.getCardSize()).toBe(15);
+        expect(element.getCardSize()).toBe(13);
         element.setConfig({
             type: "custom:departures-card",
             entities: ["sensor.lahtevat", "sensor.saapuvat"],
             departures: 4,
             combine: true,
         });
-        expect(element.getCardSize()).toBe(9);
+        expect(element.getCardSize()).toBe(7);
         element.setConfig({ type: "custom:departures-card", entities: ["sensor.lahtevat"], departures: 4 });
         expect(element.getCardSize()).toBe(7);
     });
@@ -431,13 +431,13 @@ describe("visibleDepartures with arrivals", () => {
         expect([next, ...rest].filter(Boolean).length).toBe(listed ? 1 : 0);
     });
 
-    // The count is of those still to come, the large one included. The latest two that are over are listed besides it, so
-    // a busy half hour doesn't push what's coming off the card.
+    // The count is of every one shown, the large one included. The latest two that are over come next, as far as the count
+    // has room, and the ones still to come take the rest.
     it.each([
-        [1, [-20], [10, 20], "arrivals10", ["arrivals-20"]],
-        [2, [-25, -20, -15], [10, 20, 30], "arrivals10", ["arrivals-20", "arrivals-15", "arrivals20"]],
+        [1, [-20], [10, 20], "arrivals10", []],
+        [2, [-25, -20, -15], [10, 20, 30], "arrivals10", ["arrivals-15"]],
         [3, [], [10, 20, 30, 40], "arrivals10", ["arrivals20", "arrivals30"]],
-        [3, [-20, -10], [10, 20, 30], "arrivals10", ["arrivals-20", "arrivals-10", "arrivals20", "arrivals30"]],
+        [3, [-20, -10], [10, 20, 30], "arrivals10", ["arrivals-20", "arrivals-10"]],
         [2, [-10], [], undefined, ["arrivals-10"]],
     ] as const)(
         "with a count of %s, came in %j and coming %j, the large one is %s and the rows %j",
@@ -452,23 +452,16 @@ describe("visibleDepartures with arrivals", () => {
         },
     );
 
-    // Over is an arrival that has come in, or one cancelled and past its time: the latest two are listed besides the
-    // count. A cancelled one still to come isn't counted, and is never the large one.
+    // Over is an arrival that has come in, or one cancelled and past its time: the latest two are listed within the
+    // count, as far as it has room. A cancelled one still to come is counted too, and is never the large one.
     it.each([
-        [
-            "cancelled ones past their time",
-            3,
-            true,
-            [[-20, "cancelled"], [-10, "cancelled"], [10], [20], [30]],
-            "10",
-            ["-20", "-10", "20", "30"],
-        ],
-        ["a cancelled one still to come", 2, true, [[5, "cancelled"], [10], [20]], "10", ["5", "20"]],
+        ["cancelled ones past their time", 3, true, [[-20, "cancelled"], [-10, "cancelled"], [10], [20], [30]], "10", ["-20", "-10"]],
+        ["a cancelled one still to come", 2, true, [[5, "cancelled"], [10], [20]], "10", ["5"]],
         ["one still to come earlier than one in", 3, true, [[-20], [-15], [-10, "arrived"]], "-20", ["-15", "-10"]],
         ["fewer still to come than the count", 4, true, [[-10, "arrived"], [10]], "10", ["-10"]],
         ["cancelled ones hidden", 2, false, [[-10, "cancelled"], [10], [20]], "10", ["20"]],
-        ["a cancelled one that came in", 2, true, [[-5, "arrived", "cancelled"], [10], [20]], "10", ["-5", "20"]],
-        ["a cancelled one due now, still to come", 2, true, [[0, "cancelled"], [10], [20]], "10", ["0", "20"]],
+        ["a cancelled one that came in", 2, true, [[-5, "arrived", "cancelled"], [10], [20]], "10", ["-5"]],
+        ["a cancelled one due now, still to come", 2, true, [[0, "cancelled"], [10], [20]], "10", ["0"]],
         [
             "every one still to come cancelled, one over",
             1,
@@ -479,10 +472,10 @@ describe("visibleDepartures with arrivals", () => {
                 [10, "cancelled"],
             ],
             undefined,
-            ["-10", "5"],
+            ["-10"],
         ],
         ["a cancelled one at exactly half an hour past, over", 2, true, [[-30, "cancelled"], [10]], "10", ["-30"]],
-        ["a cancelled one marked come in, before its time", 2, true, [[5, "arrived", "cancelled"], [10], [20]], "10", ["5", "20"]],
+        ["a cancelled one marked come in, before its time", 2, true, [[5, "arrived", "cancelled"], [10], [20]], "10", ["5"]],
     ] as const)("%s", (_case, count, showCancelled, items, large, rows) => {
         const list = items.map(([minutes, ...flags]) =>
             shown("arrivals", minutes, { arrived: flags.includes("arrived" as never), cancelled: flags.includes("cancelled" as never) }),
@@ -492,11 +485,11 @@ describe("visibleDepartures with arrivals", () => {
         expect(rest.map((item) => item.key)).toEqual(rows.map((minutes) => `arrivals${minutes}`));
     });
 
-    // The count is of those not cancelled, the large one included. Cancelled ones before the last counted are listed too,
-    // in their place by time, so a run of cancellations never pushes the next one that runs off the card.
+    // The count is of every one still to come, cancelled ones and the large one included, so the list is as long whatever
+    // is cancelled. The large one is the next that runs even past the count, so a run of cancellations never pushes it off.
     it.each([
-        ["departures", 1, [[5, "cancelled"], [10], [20]], "10", ["5"]],
-        ["departures", 2, [[5], [10, "cancelled"], [20], [30, "cancelled"]], "5", ["10", "20"]],
+        ["departures", 1, [[5, "cancelled"], [10], [20]], "10", []],
+        ["departures", 2, [[5], [10, "cancelled"], [20], [30, "cancelled"]], "5", ["10"]],
         [
             "departures",
             2,
@@ -508,10 +501,10 @@ describe("visibleDepartures with arrivals", () => {
             ["5", "10"],
         ],
         ["departures", 1, [[5], [10, "cancelled"]], "5", []],
-        ["arrivals", 1, [[5, "cancelled"], [10], [20]], "10", ["5"]],
+        ["arrivals", 1, [[5, "cancelled"], [10], [20]], "10", []],
         ["departures", 2, [[5], [10, "cancelled"], [20, "cancelled"]], "5", ["10"]],
-        ["departures", 2, [[5, "cancelled"], [10, "cancelled"], [20]], "20", ["5", "10"]],
-        ["departures", 2, [[5, "cancelled"], [10, "cancelled"], [20], [30, "cancelled"]], "20", ["5", "10"]],
+        ["departures", 2, [[5, "cancelled"], [10, "cancelled"], [20]], "20", ["5"]],
+        ["departures", 2, [[5, "cancelled"], [10, "cancelled"], [20], [30, "cancelled"]], "20", ["5"]],
         ["departures", 3, [[5], [10, "cancelled"]], "5", ["10"]],
         ["departures", 3, [[5], [10]], "5", ["10"]],
         [
@@ -538,8 +531,8 @@ describe("visibleDepartures with arrivals", () => {
             undefined,
             ["5"],
         ],
-        ["arrivals", 2, [[-10, "cancelled"], [5, "cancelled"], [10], [20]], "10", ["-10", "5", "20"]],
-    ] as const)("%s with a count of %s that aren't cancelled: %j", (direction, count, items, large, rows) => {
+        ["arrivals", 2, [[-10, "cancelled"], [5, "cancelled"], [10], [20]], "10", ["-10"]],
+    ] as const)("%s with a count of %s: %j", (direction, count, items, large, rows) => {
         const list = items.map(([minutes, ...flags]) => shown(direction, minutes, { cancelled: flags.includes("cancelled" as never) }));
         const { next, rest } = visibleDepartures(list, NOW, count, true);
         expect(next?.key).toBe(large === undefined ? undefined : `${direction}${large}`);
@@ -549,7 +542,7 @@ describe("visibleDepartures with arrivals", () => {
     it("never makes a departure over, cancelled and past or not", () => {
         // Three cancelled within the minute: over would keep only the latest two of them.
         const list = [-0.9, -0.6, -0.3].map((minutes) => shown("departures", minutes, { cancelled: true }));
-        const { next, rest } = visibleDepartures([...list, shown("departures", 5)], NOW, 1, true);
+        const { next, rest } = visibleDepartures([...list, shown("departures", 5)], NOW, 4, true);
         expect([next?.key, ...rest.map((item) => item.key)]).toEqual(["departures5", "departures-0.9", "departures-0.6", "departures-0.3"]);
     });
 
