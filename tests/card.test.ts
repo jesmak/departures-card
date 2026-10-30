@@ -375,7 +375,7 @@ describe("departures-card", () => {
         expect(cut.shadowRoot!.querySelector("ha-card")?.classList.contains("full")).toBe(false);
         const full = await card(state, { entities: [{ entity: "sensor.kauppatori", subtitle: "keskustaan" }], full_texts: true });
         expect(full.shadowRoot!.querySelector("ha-card")?.classList.contains("full")).toBe(true);
-        expect(full.getGridOptions()).toEqual({ columns: 12, min_columns: 6, rows: "auto", min_rows: 4 });
+        expect(full.getGridOptions()).toEqual({ columns: 12, min_columns: 6, rows: "auto", min_rows: 3 });
     });
 
     it("brings its countdowns up to date when it comes back onto the page", async () => {
@@ -414,11 +414,11 @@ describe("the card's height", () => {
     });
 
     it.each([
-        ["one stop", {}, 187, 4],
-        ["a title", { title: "Lähdöt" }, 228, 4],
-        ["only the next departure", { departures: 1 }, 138, 3],
+        ["one stop", {}, 182, 3],
+        ["a title", { title: "Lähdöt" }, 214, 4],
+        ["only the next departure", { departures: 1 }, 133, 3],
         ["two stops", { entities: ["sensor.kauppatori", "sensor.works"] }, 342, 6],
-        ["two stops in one list", { entities: ["sensor.kauppatori", "sensor.works"], combine: true }, 187, 4],
+        ["two stops in one list", { entities: ["sensor.kauppatori", "sensor.works"], combine: true }, 182, 3],
     ])("is never held lower than the next departure and one row of every stop need, with %s", async (_name, extra, minimum, rows) => {
         const state = hass({ "sensor.kauppatori": [departure("a", 11)], "sensor.works": [departure("b", 12)] });
         const element = await card(state, { ...extra, height: 100 });

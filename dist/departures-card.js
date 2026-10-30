@@ -1351,12 +1351,12 @@ var DeparturesCard = class extends i4 {
       return 0;
     }
     const padding = 32;
-    const title = this.config.title ? 41 : 0;
-    const attribution = 29;
-    const heading = 21;
-    const next = 56;
+    const title = this.config.title ? 32 : 0;
+    const attribution = 27;
+    const heading = 20;
+    const next = 54;
     const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 49 : 0;
-    const divider = 29;
+    const divider = 37;
     const stops = this.combines ? 1 : sectionsOf(this.config.entities).length;
     return padding + title + attribution + stops * (heading + next + row) + (stops - 1) * divider;
   }
@@ -1558,8 +1558,8 @@ var DeparturesCard = class extends i4 {
                         ${delay !== 0 ? b2`<span class="struck">${this.when(departure.scheduled)}</span>` : A}
                         ${minutes !== null ? b2`<span>${this.when(departure.estimated)}</span>` : A} ${this.delay(delay)}
                         ${this.platform(departure)}
+                        ${departure.notice ? b2`<span class="notice" title="${departure.notice}">${departure.notice}</span>` : A}
                     </div>
-                    ${departure.notice ? b2`<div class="notice">${departure.notice}</div>` : A}
                 </div>
                 <div class="countdown">${countdown}</div>
             </div>
@@ -1675,11 +1675,16 @@ var DeparturesCard = class extends i4 {
                     font-variant-numeric: tabular-nums;
                 }
 
+                /*
+                 * The heights step in units of 32 px, half a row of a sections view (56 px and an 8 px gap), so the card
+                 * fills whole grid rows: with no title, a stop and its next departure take 150 px with the padding and the
+                 * attribution, each later departure 32, the title 32 and each stop under another 128.
+                 */
                 .card-title {
-                    margin: 0 0 12px;
+                    margin: 0 0 4px;
                     font-size: var(--ha-card-header-font-size, 24px);
                     font-weight: var(--ha-font-weight-normal, 400);
-                    line-height: 1.2;
+                    line-height: 28px;
                 }
 
                 .sections {
@@ -1689,8 +1694,8 @@ var DeparturesCard = class extends i4 {
 
                 section + section {
                     border-top: 1px solid var(--divider-color);
-                    margin-top: 14px;
-                    padding-top: 14px;
+                    margin-top: 18px;
+                    padding-top: 18px;
                 }
 
                 @container (min-width: 620px) {
@@ -1713,8 +1718,8 @@ var DeparturesCard = class extends i4 {
 
                     section:nth-child(n + 3) {
                         border-top: 1px solid var(--divider-color);
-                        margin-top: 14px;
-                        padding-top: 14px;
+                        margin-top: 18px;
+                        padding-top: 18px;
                     }
                 }
 
@@ -1730,6 +1735,7 @@ var DeparturesCard = class extends i4 {
                     background: none;
                     color: inherit;
                     font: inherit;
+                    line-height: 20px;
                     text-align: left;
                     cursor: pointer;
                 }
@@ -1781,18 +1787,19 @@ var DeparturesCard = class extends i4 {
                 .next .headsign {
                     font-size: 20px;
                     font-weight: var(--ha-font-weight-medium, 500);
-                    line-height: 1.3;
+                    line-height: 26px;
                 }
 
                 .headsign {
                     overflow-wrap: anywhere;
                 }
 
-                /* On a narrow card the large departure's destination takes a line of its own, under the badge and countdown. */
+                /* On a narrow card the large departure's destination takes a line of its own, under the badge and countdown,
+                   which together take 32 px more than the wide layout. */
                 @container (max-width: 399px) {
                     .next {
                         flex-wrap: wrap;
-                        row-gap: 6px;
+                        row-gap: 0;
                     }
 
                     .next-text {
@@ -1800,17 +1807,39 @@ var DeparturesCard = class extends i4 {
                         flex-basis: 100%;
                     }
 
-                    .countdown {
+                    .next .badge.large {
+                        padding-block: 4px;
+                        line-height: 24px;
+                    }
+
+                    .next .countdown {
                         margin-left: auto;
+                        line-height: 32px;
                     }
                 }
 
+                /* The departure's own notice ends the line and is cut short, so the next departure is always two lines high. */
                 .meta {
                     display: flex;
                     flex-wrap: wrap;
                     align-items: center;
                     gap: 4px 6px;
                     font-size: 13px;
+                    line-height: 18px;
+                }
+
+                .meta .notice {
+                    flex: 1 1 0;
+                    min-width: 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .full .meta .notice {
+                    flex-basis: auto;
+                    white-space: normal;
+                    overflow-wrap: anywhere;
                 }
 
                 .countdown {
@@ -1821,7 +1850,9 @@ var DeparturesCard = class extends i4 {
                     white-space: nowrap;
                 }
 
+                /* Its own line height, so the smaller text doesn't make the countdown's line taller. */
                 .unit {
+                    line-height: 1;
                     font-size: 16px;
                     font-weight: var(--ha-font-weight-medium, 500);
                 }
@@ -1853,6 +1884,7 @@ var DeparturesCard = class extends i4 {
                     padding: 1px 6px;
                     border-radius: 8px;
                     font-size: 13px;
+                    line-height: 18px;
                 }
 
                 .rows .badge.small {
@@ -1871,8 +1903,9 @@ var DeparturesCard = class extends i4 {
                     flex-wrap: wrap;
                     align-items: center;
                     gap: 2px 10px;
-                    padding: 5px 0;
+                    padding: 6px 0;
                     font-size: 14px;
+                    line-height: 20px;
                 }
 
                 .time {
@@ -1893,9 +1926,10 @@ var DeparturesCard = class extends i4 {
                     min-width: 72px;
                 }
 
-                /* Below 100 px the destination takes the next line, or a short one such as Pasila would sit squeezed between them. */
+                /* Below 80 px the destination takes the next line, or a short one such as Pasila would sit squeezed between them.
+                   Half a section leaves it 99 px beside a time and a short line's badge. */
                 .row .headsign {
-                    flex: 1 1 100px;
+                    flex: 1 1 80px;
                     min-width: 0;
                 }
 
@@ -2030,6 +2064,7 @@ var DeparturesCard = class extends i4 {
                 .attribution {
                     margin-top: 12px;
                     font-size: 11px;
+                    line-height: 15px;
                     text-align: right;
                 }
 
@@ -2095,6 +2130,11 @@ var DeparturesCard = class extends i4 {
                     overflow-y: auto;
                     overscroll-behavior: contain;
                     scrollbar-width: thin;
+                }
+
+                /* Room between the rows and the scrollbar, only while there is something to scroll. */
+                .held section > .rows:is(.fade-top, .fade-bottom) {
+                    padding-right: 8px;
                 }
             `,
       fadeStyles
