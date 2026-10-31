@@ -117,29 +117,35 @@ export class DeparturesCard extends LitElement {
         return heightCardSize(this.config ?? {}, content, this.minimumHeight());
     }
 
-    /** In a sections view the card takes a whole section by default and is never narrower than half of one. */
+    /**
+     * In a sections view the card takes a whole section by default and is never narrower than three quarters of one,
+     * where a line's badge and a departure's time still fit side by side.
+     */
     public getGridOptions(): Record<string, unknown> {
-        return { columns: 12, min_columns: 6, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
+        return { columns: 12, min_columns: 9, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
     }
 
     /**
-     * Held to a height, the title, the attribution and every stop's heading, next departure and first row after it
-     * still fit, with the stops one above the other as on a narrow card, as measured on a full section's width. Notices
-     * come with the data, so they aren't counted.
+     * Held to a height, the title, the attribution and every stop's heading, which a held card keeps to one line each,
+     * and every stop's next departure and first row after it still fit, laid out as on a narrow card with the stops one
+     * above the other. A section can be narrower than 400 px at any column count, on a phone, so the narrow layout is the
+     * one counted. Notices, texts shown in full, the line about a sensor that can't be shown and a long line name
+     * wrapping on a card narrower than a section allows come with the data, so they aren't counted.
      */
     private minimumHeight(): number {
         if (!this.config) {
             return 0;
         }
-        const padding = 32;
+        const borderAndPadding = 34;
         const title = this.config.title ? 32 : 0;
         const attribution = 27;
-        const heading = 20;
-        const next = 54;
-        const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 49 : 0;
+        // The heading and the next departure, whose destination takes a line of its own on a narrow card.
+        const next = 106;
+        // The first row after it, on its two lines.
+        const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 81 : 0;
         const divider = 37;
         const stops = this.combines ? 1 : sectionsOf(this.config.entities).length;
-        return padding + title + attribution + stops * (heading + next + row) + (stops - 1) * divider;
+        return borderAndPadding + title + attribution + stops * (next + row) + (stops - 1) * divider;
     }
 
     /** The countdowns run on between the sensor's updates, so the card redraws itself while it is on the page. */
@@ -253,11 +259,12 @@ export class DeparturesCard extends LitElement {
             ...new Set(sections.map(({ entity }) => this.hass?.states[entity]?.attributes?.attribution).filter((text) => !!text)),
         ];
         const height = heightStyle(this.config, this.layout, this.minimumHeight());
+        const attribution = attributions.join(" · ");
         return html`
             <ha-card class="${this.config.full_texts ? "full" : ""} ${height ? "held" : ""}" style=${height}>
-                ${this.config.title ? html`<h1 class="card-title">${this.config.title}</h1>` : nothing}
+                ${this.config.title ? html`<h1 class="card-title" title=${this.config.title}>${this.config.title}</h1>` : nothing}
                 <div class="sections">${this.combines ? this.combined(sections) : sections.map((section) => this.section(section))}</div>
-                ${attributions.length ? html`<div class="attribution">${attributions.join(" · ")}</div>` : nothing}
+                ${attribution ? html`<div class="attribution" title=${attribution}>${attribution}</div>` : nothing}
             </ha-card>
         `;
     }
@@ -310,8 +317,8 @@ export class DeparturesCard extends LitElement {
     private heading(name: string, subtitle: string, entityId: string): TemplateResult {
         return html`
             <button class="heading" title="${entityId}" @click=${() => this.moreInfo(entityId)}>
-                <span class="name">${name}</span>
-                ${subtitle ? html`<span class="subtitle">${subtitle}</span>` : nothing}
+                <span class="name" title=${name}>${name}</span>
+                ${subtitle ? html`<span class="subtitle" title=${subtitle}>${subtitle}</span>` : nothing}
             </button>
         `;
     }
@@ -397,7 +404,9 @@ export class DeparturesCard extends LitElement {
             <div class="next">
                 ${this.badge(departure, "large")}
                 <div class="next-text">
-                    <div class="headsign">${this.directionIcon(departure)}${departure.headsign ?? ""}</div>
+                    <div class="headsign" title=${departure.headsign ?? nothing}>
+                        ${this.directionIcon(departure)}${departure.headsign ?? ""}
+                    </div>
                     <div class="meta">
                         ${this.live(departure)}
                         ${delay !== 0 ? html`<span class="struck">${this.when(departure.scheduled)}</span>` : nothing}
@@ -656,6 +665,13 @@ export class DeparturesCard extends LitElement {
                     line-height: 26px;
                 }
 
+                /* The large destination keeps to one line, so the next departure is always as tall, unless texts are shown in full. */
+                ha-card:not(.full) .next .headsign {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
                 .headsign {
                     overflow-wrap: anywhere;
                 }
@@ -811,7 +827,7 @@ export class DeparturesCard extends LitElement {
                     font-size: 12px;
                 }
 
-                /* What a row says in words: that it has come in, or its notice. Cut short as one, with the whole in its tooltip. */
+                /* What a row says in words: that it has come in, or its notice. Cut short, with the whole in its tooltip. */
                 .status {
                     display: inline-flex;
                     align-items: center;
@@ -826,8 +842,8 @@ export class DeparturesCard extends LitElement {
                 /*
                  * On a narrow card every later departure takes two lines, 64 px, whatever it shows: its time, line and what it
                  * says in words on the first, and its destination with its delay and track under them. The words and the
-                 * destination are cut short unless full_texts asks for them whole, as the numbers never are. A delay or a long
-                 * destination would otherwise make some rows taller than others as the data changes.
+                 * destination are cut short, as the numbers never are, unless full_texts asks for them whole and lets them
+                 * wrap. A delay or a long destination would otherwise make some rows taller than others as the data changes.
                  */
                 /* The info box gives up its parts to the row, and an empty item as wide as the row breaks it into its two lines,
                    each with the row's whole width. */
@@ -891,8 +907,10 @@ export class DeparturesCard extends LitElement {
                     }
 
                     .full .row .headsign,
-                    .full .row .status .alert {
+                    .full .row .status .alert,
+                    .full .row .status .arrived {
                         white-space: normal;
+                        overflow-wrap: anywhere;
                     }
                 }
 
@@ -1049,6 +1067,14 @@ export class DeparturesCard extends LitElement {
                     flex: none;
                 }
 
+                /* Held, the title and the attribution keep to one line, cut short when longer, so the minimum holds at any width. */
+                .held:not(.full) .card-title,
+                .held:not(.full) .attribution {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
                 .held .sections {
                     flex: 1 1 auto;
                     min-height: 0;
@@ -1077,6 +1103,18 @@ export class DeparturesCard extends LitElement {
 
                 .held .heading {
                     align-self: flex-start;
+                }
+
+                /* Held, a stop's heading keeps to one line too, its name and subtitle cut short when they don't fit. */
+                .held:not(.full) .heading {
+                    flex-wrap: nowrap;
+                }
+
+                .held:not(.full) .name {
+                    min-width: 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
 
                 /* Inside the card, as a held stop clips what is drawn outside it. */

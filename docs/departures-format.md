@@ -90,8 +90,9 @@ Everything else comes from the source in its own words: names, headsigns and not
 
 Less than a minute away is "now", less than an hour is minutes, and anything later is the clock time. A departure
 whose `estimated` time is more than a minute in the past is hidden, so a sensor that updates every minute doesn't
-show a bus that has already gone. Cancelled departures stay in the list unless the card is set to hide them. The stop's `notices` are shown in full under
-its name, and a departure's `notice` in full on the next departure and cut short on the rows below.
+show a bus that has already gone. Cancelled departures stay in the list unless the card is set to hide them. The stop's `notices` are shown under its
+name, and a departure's `notice` at the end of its line. Each is cut short to one line, with the full text on hover,
+unless the card is set to show texts in full.
 
 ## Arrivals
 

@@ -922,7 +922,7 @@ var en_default = {
     show_notices: "Show notices",
     show_notices_helper: "Track works and other notices for the whole stop, under its name",
     full_texts: "Show texts in full",
-    full_texts_helper: "The subtitle, the notices and a narrow card's destinations wrap instead of being cut short",
+    full_texts_helper: "Every text the card would cut short wraps instead",
     combine: "Show as one list",
     combine_helper: "Every stop's departures and arrivals in one list in time order",
     height_mode: "Height",
@@ -981,7 +981,7 @@ var fi_default = {
     show_notices: "N\xE4yt\xE4 tiedotteet",
     show_notices_helper: "Rataty\xF6t ja muut koko pys\xE4kki\xE4 koskevat tiedotteet sen nimen alla",
     full_texts: "N\xE4yt\xE4 tekstit kokonaan",
-    full_texts_helper: "Alaotsikko, tiedotteet ja kapean kortin m\xE4\xE4r\xE4np\xE4\xE4t rivitet\xE4\xE4n lyhent\xE4misen sijaan",
+    full_texts_helper: "Kaikki tekstit, jotka kortti muuten lyhent\xE4isi, rivitet\xE4\xE4n",
     combine: "N\xE4yt\xE4 yhten\xE4 listana",
     combine_helper: "Kaikkien pys\xE4kkien l\xE4hd\xF6t ja saapumiset yhdess\xE4 listassa aikaj\xE4rjestyksess\xE4",
     height_mode: "Korkeus",
@@ -1321,28 +1321,32 @@ var DeparturesCard = class extends i4 {
     const content = 1 + (2 + rows) * (!this.config || this.combines ? 1 : entities.length);
     return heightCardSize(this.config ?? {}, content, this.minimumHeight());
   }
-  /** In a sections view the card takes a whole section by default and is never narrower than half of one. */
+  /**
+   * In a sections view the card takes a whole section by default and is never narrower than three quarters of one,
+   * where a line's badge and a departure's time still fit side by side.
+   */
   getGridOptions() {
-    return { columns: 12, min_columns: 6, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
+    return { columns: 12, min_columns: 9, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
   }
   /**
-   * Held to a height, the title, the attribution and every stop's heading, next departure and first row after it
-   * still fit, with the stops one above the other as on a narrow card, as measured on a full section's width. Notices
-   * come with the data, so they aren't counted.
+   * Held to a height, the title, the attribution and every stop's heading, which a held card keeps to one line each,
+   * and every stop's next departure and first row after it still fit, laid out as on a narrow card with the stops one
+   * above the other. A section can be narrower than 400 px at any column count, on a phone, so the narrow layout is the
+   * one counted. Notices, texts shown in full, the line about a sensor that can't be shown and a long line name
+   * wrapping on a card narrower than a section allows come with the data, so they aren't counted.
    */
   minimumHeight() {
     if (!this.config) {
       return 0;
     }
-    const padding = 32;
+    const borderAndPadding = 34;
     const title = this.config.title ? 32 : 0;
     const attribution = 27;
-    const heading = 20;
-    const next = 54;
-    const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 49 : 0;
+    const next = 106;
+    const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 81 : 0;
     const divider = 37;
     const stops = this.combines ? 1 : sectionsOf(this.config.entities).length;
-    return padding + title + attribution + stops * (heading + next + row) + (stops - 1) * divider;
+    return borderAndPadding + title + attribution + stops * (next + row) + (stops - 1) * divider;
   }
   /** The countdowns run on between the sensor's updates, so the card redraws itself while it is on the page. */
   connectedCallback() {
@@ -1435,11 +1439,12 @@ var DeparturesCard = class extends i4 {
       ...new Set(sections.map(({ entity }) => this.hass?.states[entity]?.attributes?.attribution).filter((text) => !!text))
     ];
     const height = heightStyle(this.config, this.layout, this.minimumHeight());
+    const attribution = attributions.join(" \xB7 ");
     return b2`
             <ha-card class="${this.config.full_texts ? "full" : ""} ${height ? "held" : ""}" style=${height}>
-                ${this.config.title ? b2`<h1 class="card-title">${this.config.title}</h1>` : A}
+                ${this.config.title ? b2`<h1 class="card-title" title=${this.config.title}>${this.config.title}</h1>` : A}
                 <div class="sections">${this.combines ? this.combined(sections) : sections.map((section) => this.section(section))}</div>
-                ${attributions.length ? b2`<div class="attribution">${attributions.join(" \xB7 ")}</div>` : A}
+                ${attribution ? b2`<div class="attribution" title=${attribution}>${attribution}</div>` : A}
             </ha-card>
         `;
   }
@@ -1487,8 +1492,8 @@ var DeparturesCard = class extends i4 {
   heading(name, subtitle, entityId) {
     return b2`
             <button class="heading" title="${entityId}" @click=${() => this.moreInfo(entityId)}>
-                <span class="name">${name}</span>
-                ${subtitle ? b2`<span class="subtitle">${subtitle}</span>` : A}
+                <span class="name" title=${name}>${name}</span>
+                ${subtitle ? b2`<span class="subtitle" title=${subtitle}>${subtitle}</span>` : A}
             </button>
         `;
   }
@@ -1550,7 +1555,9 @@ var DeparturesCard = class extends i4 {
             <div class="next">
                 ${this.badge(departure, "large")}
                 <div class="next-text">
-                    <div class="headsign">${this.directionIcon(departure)}${departure.headsign ?? ""}</div>
+                    <div class="headsign" title=${departure.headsign ?? A}>
+                        ${this.directionIcon(departure)}${departure.headsign ?? ""}
+                    </div>
                     <div class="meta">
                         ${this.live(departure)}
                         ${delay !== 0 ? b2`<span class="struck">${this.when(departure.scheduled)}</span>` : A}
@@ -1789,6 +1796,13 @@ var DeparturesCard = class extends i4 {
                     line-height: 26px;
                 }
 
+                /* The large destination keeps to one line, so the next departure is always as tall, unless texts are shown in full. */
+                ha-card:not(.full) .next .headsign {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
                 .headsign {
                     overflow-wrap: anywhere;
                 }
@@ -1944,7 +1958,7 @@ var DeparturesCard = class extends i4 {
                     font-size: 12px;
                 }
 
-                /* What a row says in words: that it has come in, or its notice. Cut short as one, with the whole in its tooltip. */
+                /* What a row says in words: that it has come in, or its notice. Cut short, with the whole in its tooltip. */
                 .status {
                     display: inline-flex;
                     align-items: center;
@@ -1959,8 +1973,8 @@ var DeparturesCard = class extends i4 {
                 /*
                  * On a narrow card every later departure takes two lines, 64 px, whatever it shows: its time, line and what it
                  * says in words on the first, and its destination with its delay and track under them. The words and the
-                 * destination are cut short unless full_texts asks for them whole, as the numbers never are. A delay or a long
-                 * destination would otherwise make some rows taller than others as the data changes.
+                 * destination are cut short, as the numbers never are, unless full_texts asks for them whole and lets them
+                 * wrap. A delay or a long destination would otherwise make some rows taller than others as the data changes.
                  */
                 /* The info box gives up its parts to the row, and an empty item as wide as the row breaks it into its two lines,
                    each with the row's whole width. */
@@ -2024,8 +2038,10 @@ var DeparturesCard = class extends i4 {
                     }
 
                     .full .row .headsign,
-                    .full .row .status .alert {
+                    .full .row .status .alert,
+                    .full .row .status .arrived {
                         white-space: normal;
+                        overflow-wrap: anywhere;
                     }
                 }
 
@@ -2182,6 +2198,14 @@ var DeparturesCard = class extends i4 {
                     flex: none;
                 }
 
+                /* Held, the title and the attribution keep to one line, cut short when longer, so the minimum holds at any width. */
+                .held:not(.full) .card-title,
+                .held:not(.full) .attribution {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
                 .held .sections {
                     flex: 1 1 auto;
                     min-height: 0;
@@ -2210,6 +2234,18 @@ var DeparturesCard = class extends i4 {
 
                 .held .heading {
                     align-self: flex-start;
+                }
+
+                /* Held, a stop's heading keeps to one line too, its name and subtitle cut short when they don't fit. */
+                .held:not(.full) .heading {
+                    flex-wrap: nowrap;
+                }
+
+                .held:not(.full) .name {
+                    min-width: 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
 
                 /* Inside the card, as a held stop clips what is drawn outside it. */

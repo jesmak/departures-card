@@ -41,7 +41,7 @@
         "show_notices": "Show notices",
         "show_notices_helper": "Track works and other notices for the whole stop, under its name",
         "full_texts": "Show texts in full",
-        "full_texts_helper": "The subtitle, the notices and a narrow card's destinations wrap instead of being cut short",
+        "full_texts_helper": "Every text the card would cut short wraps instead",
         "combine": "Show as one list",
         "combine_helper": "Every stop's departures and arrivals in one list in time order",
         "height_mode": "Height",

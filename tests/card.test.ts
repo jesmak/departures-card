@@ -369,13 +369,129 @@ describe("departures-card", () => {
         expect(text(root.querySelector(".name"))).toBe("Kauppatori");
     });
 
-    it("cuts the subtitle short unless texts are shown in full, and is never narrower than half a section", async () => {
+    it("cuts the subtitle short unless texts are shown in full, and is never narrower than three quarters of a section", async () => {
         const state = hass({ "sensor.kauppatori": [departure("a", 5)] });
         const cut = await card(state, { entities: [{ entity: "sensor.kauppatori", subtitle: "keskustaan" }] });
         expect(cut.shadowRoot!.querySelector("ha-card")?.classList.contains("full")).toBe(false);
         const full = await card(state, { entities: [{ entity: "sensor.kauppatori", subtitle: "keskustaan" }], full_texts: true });
         expect(full.shadowRoot!.querySelector("ha-card")?.classList.contains("full")).toBe(true);
-        expect(full.getGridOptions()).toEqual({ columns: 12, min_columns: 6, rows: "auto", min_rows: 3 });
+        expect(full.getGridOptions()).toEqual({ columns: 12, min_columns: 9, rows: "auto", min_rows: 4 });
+    });
+
+    // Every text the card can cut short carries its own text as a tooltip, in every state, so it shows in full when the
+    // mouse is over it whenever it is cut: the title, the attribution, the stop's name, subtitle and notices, the next
+    // departure's destination and notice, and the later departures' destinations and what they say in words. The
+    // heading itself names the sensor it opens.
+    const kauppatori = { entity: "sensor.kauppatori", name: "Kauppatori", subtitle: "keskustaan" };
+    const asema = { entity: "sensor.works", name: "Asema" };
+    it.each<
+        [string, Partial<DeparturesCardConfig>, string | undefined, "stated" | "unavailable" | undefined, boolean, string, string | null]
+    >([
+        ["by its content", { entities: [kauppatori] }, undefined, undefined, false, "Kauppatori", "keskustaan"],
+        ["held to a height", { entities: [kauppatori], height: 300 }, undefined, undefined, true, "Kauppatori", "keskustaan"],
+        ["held up to a limit", { entities: [kauppatori], max_height: 300 }, undefined, undefined, true, "Kauppatori", "keskustaan"],
+        [
+            "held by rows in a sections view",
+            { entities: [kauppatori], grid_options: { rows: 8 } },
+            "grid",
+            undefined,
+            true,
+            "Kauppatori",
+            "keskustaan",
+        ],
+        [
+            "by rows outside a sections view",
+            { entities: [kauppatori], grid_options: { rows: 8 } },
+            undefined,
+            undefined,
+            false,
+            "Kauppatori",
+            "keskustaan",
+        ],
+        [
+            "held with texts in full",
+            { entities: [kauppatori], height: 300, full_texts: true },
+            undefined,
+            undefined,
+            true,
+            "Kauppatori",
+            "keskustaan",
+        ],
+        ["with texts in full", { entities: [kauppatori], full_texts: true }, undefined, undefined, false, "Kauppatori", "keskustaan"],
+        [
+            "held, with no subtitle",
+            { entities: [{ entity: "sensor.kauppatori", name: "Kauppatori" }], height: 300 },
+            undefined,
+            undefined,
+            true,
+            "Kauppatori",
+            null,
+        ],
+        [
+            "held, two stops in one list",
+            { entities: [kauppatori, asema], combine: true, height: 300 },
+            undefined,
+            undefined,
+            true,
+            "Kauppatori, Asema",
+            null,
+        ],
+        ["two stops in one list", { entities: [kauppatori, asema], combine: true }, undefined, undefined, false, "Kauppatori, Asema", null],
+        [
+            "two stops in one list that state their direction",
+            { entities: [kauppatori, asema], combine: true },
+            undefined,
+            "stated",
+            false,
+            "Kauppatori, Asema",
+            "Lähtevät",
+        ],
+        [
+            "held, with its sensor unavailable",
+            { entities: [kauppatori], height: 300 },
+            undefined,
+            "unavailable",
+            true,
+            "Kauppatori",
+            "keskustaan",
+        ],
+    ])("shows its cut texts in full on hover, sized %s", async (_name, config, layout, sensors, held, name, subtitle) => {
+        const state = hass({
+            "sensor.kauppatori":
+                sensors === "unavailable"
+                    ? "unavailable"
+                    : [
+                          departure("a", 5, { notice: "Lähtee laiturilta 2" }),
+                          departure("c", 8, { cancelled: true, headsign: "Pasila" }),
+                          departure("d", 9, { arrived: true, notice: "Kiertotie" }),
+                      ],
+            "sensor.works": [departure("b", 6)],
+        });
+        if (sensors === "stated") {
+            for (const entity of Object.values(state.states)) entity!.attributes.direction = "departures";
+        }
+        if (sensors !== "unavailable") {
+            state.states["sensor.kauppatori"]!.attributes.notices = ["Pysäkki siirretty"];
+        }
+        const element = await card(state, { title: "Lähdöt", ...config }, layout);
+        const root = element.shadowRoot!;
+        const shown = sensors !== "unavailable";
+        expect(root.querySelector("ha-card")!.classList.contains("held")).toBe(held);
+        expect(root.querySelector(".card-title")?.getAttribute("title")).toBe("Lähdöt");
+        expect(root.querySelector(".attribution")?.getAttribute("title") ?? null).toBe(shown ? "Digitransit, CC BY 4.0" : null);
+        expect(root.querySelector(".next .headsign")?.getAttribute("title") ?? null).toBe(shown ? "Koskela" : null);
+        const heading = root.querySelector(".heading")!;
+        expect(heading.getAttribute("title")).toBe("sensor.kauppatori");
+        expect(heading.querySelector(".name")?.getAttribute("title")).toBe(name);
+        expect(heading.querySelector(".subtitle")?.getAttribute("title") ?? null).toBe(subtitle);
+        const titles = (selector: string) => [...root.querySelectorAll(selector)].map((element) => element.getAttribute("title"));
+        const words = (key: string) => translate("fi", key);
+        const stopNotices = ["Pysäkki siirretty", ...(config.combine ? ["Ratatyöt. Junat korvataan busseilla."] : [])];
+        expect(titles(".stop-notice")).toEqual(shown ? stopNotices : []);
+        expect(titles(".next .meta .notice")).toEqual(shown ? ["Lähtee laiturilta 2"] : []);
+        expect(titles(".rows .status")).toEqual(shown ? [words("common.cancelled"), `${words("common.arrived")}, Kiertotie`] : []);
+        const destinations = titles(".rows .headsign");
+        expect(destinations).toEqual(shown ? [...(config.combine ? ["Koskela"] : []), "Pasila", "Koskela"] : []);
     });
 
     it("brings its countdowns up to date when it comes back onto the page", async () => {
@@ -413,12 +529,24 @@ describe("the card's height", () => {
         expect(element.shadowRoot!.querySelector("ha-card")?.getAttribute("style") ?? "").toBe(style);
     });
 
+    // The border and padding (34 px), a title on one line (32), the attribution (27) and, as on a narrow card, every
+    // stop's heading and next departure (106) with the first row after them on its two lines (81), and the divider
+    // between stops (37). A section can be narrow at any column count, so the narrow layout is always the one counted.
     it.each([
-        ["one stop", {}, 182, 3],
-        ["a title", { title: "Lähdöt" }, 214, 4],
-        ["only the next departure", { departures: 1 }, 133, 3],
-        ["two stops", { entities: ["sensor.kauppatori", "sensor.works"] }, 342, 6],
-        ["two stops in one list", { entities: ["sensor.kauppatori", "sensor.works"], combine: true }, 182, 3],
+        ["one stop", {}, 248, 4],
+        ["a title", { title: "Lähdöt" }, 280, 5],
+        ["only the next departure", { departures: 1 }, 167, 3],
+        ["two stops", { entities: ["sensor.kauppatori", "sensor.works"] }, 472, 8],
+        ["two stops and a title", { title: "Lähdöt", entities: ["sensor.kauppatori", "sensor.works"] }, 504, 8],
+        ["two stops in one list", { entities: ["sensor.kauppatori", "sensor.works"], combine: true }, 248, 4],
+        ["two stops in one list and a title", { title: "Lähdöt", entities: ["sensor.kauppatori", "sensor.works"], combine: true }, 280, 5],
+        [
+            "two stops in one list, only the next departure",
+            { departures: 1, entities: ["sensor.kauppatori", "sensor.works"], combine: true },
+            167,
+            3,
+        ],
+        ["two stops, only their next departures", { departures: 1, entities: ["sensor.kauppatori", "sensor.works"] }, 310, 5],
     ])("is never held lower than the next departure and one row of every stop need, with %s", async (_name, extra, minimum, rows) => {
         const state = hass({ "sensor.kauppatori": [departure("a", 11)], "sensor.works": [departure("b", 12)] });
         const element = await card(state, { ...extra, height: 100 });

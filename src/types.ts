@@ -21,7 +21,7 @@ export interface DeparturesCardConfig extends LovelaceCardConfig, HeightConfig {
     show_cancelled?: boolean;
     /** The stop's notices, such as track works, are shown under its name unless this is false. */
     show_notices?: boolean;
-    /** The subtitle and the notices in the rows wrap in full instead of being cut short. */
+    /** Every text the card would cut short wraps instead. */
     full_texts?: boolean;
     /** All the sensors as one list by time instead of a section each, such as an airport's departures and arrivals. */
     combine?: boolean;
