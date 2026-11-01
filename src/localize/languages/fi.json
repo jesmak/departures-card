@@ -5,6 +5,7 @@
         "invalid_configuration": "Virheellinen konfiguraatio. Lisää vähintään yksi pysäkkianturi.",
         "invalid_departures": "Virheellinen konfiguraatio. Lähtöjen määrän pitää olla kokonaisluku, vähintään 1.",
         "invalid_height": "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikseleinä, ja korkeustilan (height_mode) auto, fixed tai max.",
+        "invalid_row_step": "Virheellinen pyöristys. Pyöristyksen (row_step) on oltava full tai half.",
         "no_entity": "Entiteettiä {entity} ei löydy",
         "not_departures": "{entity} ei ole pysäkkianturi",
         "unavailable": "Lähtötiedot eivät ole juuri nyt saatavilla",
@@ -20,7 +21,7 @@
         "arrivals": "Saapuvat",
         "no_arrivals": "Ei saapuvia",
         "hall": "Aula",
-        "landed": "Laskeutunut",
+        "landed": "Maassa",
         "arrived": "Saapunut",
         "departing": "Lähtevä",
         "arriving": "Saapuva",
@@ -52,6 +53,10 @@
         "height": "Kiinteä korkeus",
         "height_helper": "Kortti on aina näin korkea, ja lähdöt vierivät sen sisällä.",
         "max_height": "Enimmäiskorkeus",
-        "max_height_helper": "Kortti kasvaa sisältönsä mukana tähän korkeuteen asti, ja sen jälkeen lähdöt vierivät."
+        "max_height_helper": "Kortti kasvaa sisältönsä mukana tähän korkeuteen asti, ja sen jälkeen lähdöt vierivät.",
+        "row_step": "Pyöristys osioihin jaetussa näkymässä",
+        "row_step_helper": "Automaattisella rivikorkeudella kortin korkeus pyöristetään ylöspäin kokonaisiin riveihin, tai tilan säästämiseksi puolikkaisiin riveihin.",
+        "row_step_full": "Kokonaisiin riveihin",
+        "row_step_half": "Puolikkaisiin riveihin"
     }
 }

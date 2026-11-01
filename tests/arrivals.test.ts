@@ -199,7 +199,7 @@ describe("arrivals and directions", () => {
         });
         const state = hass({ "sensor.saapuvat": { departures: [late, flight("ay6", 5)], direction: "arrivals" } });
         const row = (await card(state, { entities: ["sensor.saapuvat"] })).shadowRoot!.querySelector(".row.came-in");
-        expect(text(row)).toBe("11.48 AY5 Oulu +13 min Laskeutunut Matkatavarat myöhässä Aula 2A");
+        expect(text(row)).toBe("11.48 AY5 Oulu +13 min Maassa Matkatavarat myöhässä Aula 2A");
     });
 
     it("lists only the two latest that have landed, within the count", async () => {
@@ -240,7 +240,7 @@ describe("arrivals and directions", () => {
         expect(text(root.querySelector(".next .countdown"))).toBe("5 min");
         expect(text(root.querySelector(".next .platform"))).toBe("Aula 2B");
         const row = root.querySelector(".row.came-in");
-        expect(text(row)).toBe("11.48 AY5 Oulu Laskeutunut Aula 2A");
+        expect(text(row)).toBe("11.48 AY5 Oulu Maassa Aula 2A");
         expect(row?.querySelector(".arrived")).not.toBeNull();
         expect(row?.querySelector(".alert")).toBeNull();
     });

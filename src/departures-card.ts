@@ -29,10 +29,14 @@ import "./editor";
 import { ScrollFade, fadeStyles } from "./fade";
 import type { HassEntity, HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
+import { filledHeight, validRowStep } from "./rows";
 import { browserLanguage, translate } from "./localize/localize";
 import type { Departure, DeparturesCardConfig, SectionConfig, ShownDeparture } from "./types";
 
 /** The icons that show which way a departure goes, by mode. */
+/** The gap under the title, to which the room a whole row leaves over is added. */
+const TITLE_GAP_PX = 4;
+
 const DIRECTION_ICONS: Record<string, { departing: string; arriving: string }> = {
     plane: { departing: "mdi:airplane-takeoff", arriving: "mdi:airplane-landing" },
     train: { departing: "mdi:location-exit", arriving: "mdi:location-enter" },
@@ -68,6 +72,10 @@ export class DeparturesCard extends LitElement {
     /** Set by the dashboard: "grid" in a sections view. */
     @property({ attribute: false }) public layout?: string;
     @state() private config?: DeparturesCardConfig;
+    /** On automatic rows in a sections view, the height that ends the card on a whole row (or half); 0 when it isn't set. */
+    @state() private filled = 0;
+    /** The room that height leaves over, put under the title rather than under the attribution. */
+    @state() private spare = 0;
     private ticker?: ReturnType<typeof setInterval>;
     private readonly resizes = new ResizeObserver(() => this.alignBadgesSoon());
     private frame?: number;
@@ -101,6 +109,9 @@ export class DeparturesCard extends LitElement {
         }
         if (!validHeight(config)) {
             throw new Error(translate(browserLanguage(), "common.invalid_height"));
+        }
+        if (!validRowStep(config)) {
+            throw new Error(translate(browserLanguage(), "common.invalid_row_step"));
         }
         this.config = { ...config, entities };
     }
@@ -201,7 +212,42 @@ export class DeparturesCard extends LitElement {
             this.alignBadges();
             this.keepNextDepartures();
             this.markScrolling();
+            this.fillRows();
         });
+    }
+
+    /**
+     * On automatic rows in a sections view, the card takes the whole rows its content needs, or the half rows with
+     * `row_step: half`, so the cards under it stay on the rows. The content is measured to the end of the card's last
+     * part, never by the card's own height, which is at least the rows already taken, and less the room already put under
+     * the title, as drawn.
+     */
+    private fillRows(): void {
+        const card = this.renderRoot.querySelector<HTMLElement>("ha-card");
+        const last = card?.querySelector<HTMLElement>(":scope > .attribution") ?? card?.querySelector<HTMLElement>(":scope > .sections");
+        if (!card || !last || !card.clientWidth || this.layout !== "grid" || card.classList.contains("held")) {
+            if (this.filled) this.filled = 0;
+            if (this.spare) this.spare = 0;
+            return;
+        }
+        const style = getComputedStyle(card);
+        const title = card.querySelector<HTMLElement>(":scope > .card-title");
+        const sections = card.querySelector<HTMLElement>(":scope > .sections");
+        const shown = title
+            ? (parseFloat(getComputedStyle(title).marginBottom) || 0) - TITLE_GAP_PX
+            : sections
+              ? parseFloat(getComputedStyle(sections).marginTop) || 0
+              : 0;
+        const content =
+            last.getBoundingClientRect().bottom -
+            card.getBoundingClientRect().top +
+            (parseFloat(style.paddingBottom) || 0) +
+            (parseFloat(style.borderBottomWidth) || 0) -
+            Math.max(0, shown);
+        const filled = filledHeight(Math.round(content), this.config ?? {});
+        const spare = Math.max(0, Math.floor(filled - content));
+        if (filled !== this.filled) this.filled = filled;
+        if (spare !== this.spare) this.spare = spare;
     }
 
     /**
@@ -260,8 +306,10 @@ export class DeparturesCard extends LitElement {
         ];
         const height = heightStyle(this.config, this.layout, this.minimumHeight());
         const attribution = attributions.join(" · ");
+        const classes = [this.config.full_texts && "full", height && "held", this.config.title && "titled"].filter(Boolean).join(" ");
+        const style = height || (this.filled ? `min-height: ${this.filled}px; --departures-spare: ${this.spare}px` : "");
         return html`
-            <ha-card class="${this.config.full_texts ? "full" : ""} ${height ? "held" : ""}" style=${height}>
+            <ha-card class=${classes} style=${style}>
                 ${this.config.title ? html`<h1 class="card-title" title=${this.config.title}>${this.config.title}</h1>` : nothing}
                 <div class="sections">${this.combines ? this.combined(sections) : sections.map((section) => this.section(section))}</div>
                 ${attribution ? html`<div class="attribution" title=${attribution}>${attribution}</div>` : nothing}
@@ -551,12 +599,13 @@ export class DeparturesCard extends LitElement {
                 }
 
                 /*
-                 * The heights step in units of 32 px, half a row of a sections view (56 px and an 8 px gap), so the card
-                 * fills whole grid rows: with no title, a stop and its next departure take 150 px with the padding and the
-                 * attribution, each later departure 32, the title 32 and each stop under another 128.
+                 * The heights step in units of 32 px, half a row of a sections view (56 px and an 8 px gap): each later
+                 * departure 32, the title 32 and each stop under another 128. The card ends on a half row or a whole one by
+                 * its content, and fillRows rounds it to whole rows unless row_step is half. The room that leaves goes under
+                 * the title, or at the top without one.
                  */
                 .card-title {
-                    margin: 0 0 4px;
+                    margin: 0 0 calc(4px + var(--departures-spare, 0px));
                     font-size: var(--ha-card-header-font-size, 24px);
                     font-weight: var(--ha-font-weight-normal, 400);
                     line-height: 28px;
@@ -565,6 +614,10 @@ export class DeparturesCard extends LitElement {
                 .sections {
                     display: grid;
                     grid-template-columns: minmax(0, 1fr);
+                }
+
+                ha-card:not(.titled) > .sections {
+                    margin-top: var(--departures-spare, 0px);
                 }
 
                 section + section {

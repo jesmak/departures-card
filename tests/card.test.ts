@@ -699,6 +699,50 @@ describe("the card's height", () => {
         );
     });
 
+    it("refuses a row step other than whole or half rows, with an error about the rounding", () => {
+        const element = document.createElement("departures-card");
+        const config = (extra: Record<string, unknown>) =>
+            ({ type: "custom:departures-card", entities: ["sensor.kauppatori"], ...extra }) as never;
+        const error = translate(browserLanguage(), "common.invalid_row_step");
+        expect(error).toMatch(/^Invalid rounding\./);
+        expect(() => element.setConfig(config({ row_step: "quarter" }))).toThrow(error);
+        expect(() => element.setConfig(config({ row_step: "half" }))).not.toThrow();
+        expect(() => element.setConfig(config({ row_step: null }))).not.toThrow();
+    });
+
+    // happy-dom lays nothing out, so the card's last part ends where `bottom` says, under 16 px of padding and a 1 px border.
+    it.each<[string, string | undefined, Partial<DeparturesCardConfig>, number, string]>([
+        [
+            "half a row short, to the next whole row with the half row under the title",
+            "grid",
+            { title: "Lähdöt" },
+            199,
+            "min-height: 248px; --departures-spare: 32px",
+        ],
+        ["on a whole row already, with nothing over", "grid", {}, 231, "min-height: 248px; --departures-spare: 0px"],
+        ["half a row short, kept there with half rows", "grid", { row_step: "half" }, 199, "min-height: 216px; --departures-spare: 0px"],
+        ["not outside a sections view", undefined, {}, 199, ""],
+        ["not when held to a height", "grid", { height: 400 }, 199, "height: 400px"],
+    ])("ends %s", async (_name, layout, extra, bottom, style) => {
+        const element = await card(hass({}), extra, layout);
+        const haCard = element.shadowRoot!.querySelector<HTMLElement>("ha-card")!;
+        Object.defineProperty(haCard, "clientWidth", { value: 454, configurable: true });
+        haCard.getBoundingClientRect = () => ({ top: 0 }) as DOMRect;
+        const last = haCard.querySelector<HTMLElement>(":scope > .attribution") ?? haCard.querySelector<HTMLElement>(":scope > .sections")!;
+        last.getBoundingClientRect = () => ({ bottom }) as DOMRect;
+        vi.spyOn(window, "getComputedStyle").mockReturnValue({
+            paddingBottom: "16px",
+            borderBottomWidth: "1px",
+            marginBottom: "4px",
+            marginTop: "0px",
+            width: "0px",
+        } as CSSStyleDeclaration);
+        (element as unknown as { fillRows(): void }).fillRows();
+        vi.restoreAllMocks();
+        await element.updateComplete;
+        expect(haCard.getAttribute("style") ?? "").toBe(style);
+    });
+
     it("keeps a held stop's next departure and first later row in view, and only a stop that has later rows", async () => {
         vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
         vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {

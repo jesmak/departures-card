@@ -10,6 +10,7 @@ import { DEFAULT_DEPARTURES } from "./const";
 import { departuresSensors, sectionsOf } from "./departures";
 import type { HomeAssistant } from "./hass";
 import { heightData, heightSchema, tidyHeight } from "./height";
+import { rowStepData, rowStepSchema, tidyRowStep } from "./rows";
 import { browserLanguage, translate } from "./localize/localize";
 import type { DeparturesCardConfig, SectionConfig } from "./types";
 
@@ -66,6 +67,7 @@ function optionsSchema(config: DeparturesCardConfig, text: (key: string) => stri
             ],
         },
         ...heightSchema(config, text),
+        ...rowStepSchema(config, text),
     ];
 }
 
@@ -107,7 +109,7 @@ export class DeparturesCardEditor extends LitElement {
             return nothing;
         }
         // The form edits every stop as an object; plain entity ids are expanded for it.
-        const data = formData(heightData(this.config));
+        const data = formData(rowStepData(heightData(this.config)));
         // Two forms, so that the stops' helper, which Home Assistant's list of objects doesn't show, sits under the stops.
         return html`
             <ha-form
@@ -142,7 +144,7 @@ export class DeparturesCardEditor extends LitElement {
     }
 
     private valueChanged(event: CustomEvent<{ value: DeparturesCardConfig }>): void {
-        const config: DeparturesCardConfig = tidyHeight(event.detail.value);
+        const config: DeparturesCardConfig = tidyRowStep(tidyHeight(event.detail.value));
         config.entities = compactSections((config.entities ?? []) as SectionConfig[]);
         if (!config.title) {
             delete config.title;

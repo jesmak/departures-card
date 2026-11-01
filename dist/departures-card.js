@@ -878,6 +878,41 @@ function tidyHeight(config) {
   return tidied;
 }
 
+// src/rows.ts
+var ROW_STEPS = ["full", "half"];
+var ROW_PX = 64;
+var ROW_GAP_PX = 8;
+function validRowStep(config) {
+  return config.row_step === void 0 || config.row_step === null || ROW_STEPS.includes(config.row_step);
+}
+function filledHeight(content, config) {
+  const step = config.row_step === "half" ? ROW_PX / 2 : ROW_PX;
+  return Math.max(1, Math.ceil((content + ROW_GAP_PX) / step)) * step - ROW_GAP_PX;
+}
+function rowStepSchema(config, text) {
+  if (heightMode(config) !== "auto") {
+    return [];
+  }
+  return [
+    {
+      name: "row_step",
+      selector: {
+        select: { mode: "dropdown", options: ROW_STEPS.map((value) => ({ value, label: text(`editor.row_step_${value}`) })) }
+      }
+    }
+  ];
+}
+function rowStepData(config) {
+  return { ...config, row_step: config.row_step ?? "full" };
+}
+function tidyRowStep(config) {
+  const tidied = { ...config };
+  if (tidied.row_step !== "half" || heightMode(tidied) !== "auto") {
+    delete tidied.row_step;
+  }
+  return tidied;
+}
+
 // src/localize/languages/en.json
 var en_default = {
   common: {
@@ -886,6 +921,7 @@ var en_default = {
     invalid_configuration: "Invalid configuration. Add at least one departures sensor.",
     invalid_departures: "Invalid configuration. The number of departures must be a whole number, at least 1.",
     invalid_height: "Invalid height. height and max_height must be positive numbers of pixels, and height_mode auto, fixed or max.",
+    invalid_row_step: "Invalid rounding. row_step must be full or half.",
     no_entity: "Entity {entity} not found",
     not_departures: "{entity} is not a departures sensor",
     unavailable: "Departures are not available right now",
@@ -933,7 +969,11 @@ var en_default = {
     height: "Fixed height",
     height_helper: "The card is always this tall, and the departures scroll inside it.",
     max_height: "Maximum height",
-    max_height_helper: "The card grows with its content up to this height, and then the departures scroll."
+    max_height_helper: "The card grows with its content up to this height, and then the departures scroll.",
+    row_step: "Rounding in a sections view",
+    row_step_helper: "With automatic row height, the card's height is rounded up to whole rows, or to half rows to save space.",
+    row_step_full: "Whole rows",
+    row_step_half: "Half rows"
   }
 };
 
@@ -945,6 +985,7 @@ var fi_default = {
     invalid_configuration: "Virheellinen konfiguraatio. Lis\xE4\xE4 v\xE4hint\xE4\xE4n yksi pys\xE4kkianturi.",
     invalid_departures: "Virheellinen konfiguraatio. L\xE4ht\xF6jen m\xE4\xE4r\xE4n pit\xE4\xE4 olla kokonaisluku, v\xE4hint\xE4\xE4n 1.",
     invalid_height: "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikselein\xE4, ja korkeustilan (height_mode) auto, fixed tai max.",
+    invalid_row_step: "Virheellinen py\xF6ristys. Py\xF6ristyksen (row_step) on oltava full tai half.",
     no_entity: "Entiteetti\xE4 {entity} ei l\xF6ydy",
     not_departures: "{entity} ei ole pys\xE4kkianturi",
     unavailable: "L\xE4ht\xF6tiedot eiv\xE4t ole juuri nyt saatavilla",
@@ -960,7 +1001,7 @@ var fi_default = {
     arrivals: "Saapuvat",
     no_arrivals: "Ei saapuvia",
     hall: "Aula",
-    landed: "Laskeutunut",
+    landed: "Maassa",
     arrived: "Saapunut",
     departing: "L\xE4htev\xE4",
     arriving: "Saapuva",
@@ -992,7 +1033,11 @@ var fi_default = {
     height: "Kiinte\xE4 korkeus",
     height_helper: "Kortti on aina n\xE4in korkea, ja l\xE4hd\xF6t vieriv\xE4t sen sis\xE4ll\xE4.",
     max_height: "Enimm\xE4iskorkeus",
-    max_height_helper: "Kortti kasvaa sis\xE4lt\xF6ns\xE4 mukana t\xE4h\xE4n korkeuteen asti, ja sen j\xE4lkeen l\xE4hd\xF6t vieriv\xE4t."
+    max_height_helper: "Kortti kasvaa sis\xE4lt\xF6ns\xE4 mukana t\xE4h\xE4n korkeuteen asti, ja sen j\xE4lkeen l\xE4hd\xF6t vieriv\xE4t.",
+    row_step: "Py\xF6ristys osioihin jaetussa n\xE4kym\xE4ss\xE4",
+    row_step_helper: "Automaattisella rivikorkeudella kortin korkeus py\xF6ristet\xE4\xE4n yl\xF6sp\xE4in kokonaisiin riveihin, tai tilan s\xE4\xE4st\xE4miseksi puolikkaisiin riveihin.",
+    row_step_full: "Kokonaisiin riveihin",
+    row_step_half: "Puolikkaisiin riveihin"
   }
 };
 
@@ -1066,7 +1111,8 @@ function optionsSchema(config, text) {
         { name: "combine", selector: { boolean: {} } }
       ]
     },
-    ...heightSchema(config, text)
+    ...heightSchema(config, text),
+    ...rowStepSchema(config, text)
   ];
 }
 function formData(config) {
@@ -1098,7 +1144,7 @@ var DeparturesCardEditor = class extends i4 {
     if (!this.hass) {
       return A;
     }
-    const data = formData(heightData(this.config));
+    const data = formData(rowStepData(heightData(this.config)));
     return b2`
             <ha-form
                 .hass=${this.hass}
@@ -1130,7 +1176,7 @@ var DeparturesCardEditor = class extends i4 {
         `;
   }
   valueChanged(event) {
-    const config = tidyHeight(event.detail.value);
+    const config = tidyRowStep(tidyHeight(event.detail.value));
     config.entities = compactSections(config.entities ?? []);
     if (!config.title) {
       delete config.title;
@@ -1263,6 +1309,7 @@ var ScrollFade = class {
 };
 
 // src/departures-card.ts
+var TITLE_GAP_PX = 4;
 var DIRECTION_ICONS = {
   plane: { departing: "mdi:airplane-takeoff", arriving: "mdi:airplane-landing" },
   train: { departing: "mdi:location-exit", arriving: "mdi:location-enter" }
@@ -1285,6 +1332,8 @@ registry.customCards.push({
 var DeparturesCard = class extends i4 {
   constructor() {
     super();
+    this.filled = 0;
+    this.spare = 0;
     this.resizes = new ResizeObserver(() => this.alignBadgesSoon());
     new ScrollFade(
       this,
@@ -1308,6 +1357,9 @@ var DeparturesCard = class extends i4 {
     }
     if (!validHeight(config)) {
       throw new Error(translate(browserLanguage(), "common.invalid_height"));
+    }
+    if (!validRowStep(config)) {
+      throw new Error(translate(browserLanguage(), "common.invalid_row_step"));
     }
     this.config = { ...config, entities };
   }
@@ -1394,7 +1446,32 @@ var DeparturesCard = class extends i4 {
       this.alignBadges();
       this.keepNextDepartures();
       this.markScrolling();
+      this.fillRows();
     });
+  }
+  /**
+   * On automatic rows in a sections view, the card takes the whole rows its content needs, or the half rows with
+   * `row_step: half`, so the cards under it stay on the rows. The content is measured to the end of the card's last
+   * part, never by the card's own height, which is at least the rows already taken, and less the room already put under
+   * the title, as drawn.
+   */
+  fillRows() {
+    const card = this.renderRoot.querySelector("ha-card");
+    const last = card?.querySelector(":scope > .attribution") ?? card?.querySelector(":scope > .sections");
+    if (!card || !last || !card.clientWidth || this.layout !== "grid" || card.classList.contains("held")) {
+      if (this.filled) this.filled = 0;
+      if (this.spare) this.spare = 0;
+      return;
+    }
+    const style = getComputedStyle(card);
+    const title = card.querySelector(":scope > .card-title");
+    const sections = card.querySelector(":scope > .sections");
+    const shown = title ? (parseFloat(getComputedStyle(title).marginBottom) || 0) - TITLE_GAP_PX : sections ? parseFloat(getComputedStyle(sections).marginTop) || 0 : 0;
+    const content = last.getBoundingClientRect().bottom - card.getBoundingClientRect().top + (parseFloat(style.paddingBottom) || 0) + (parseFloat(style.borderBottomWidth) || 0) - Math.max(0, shown);
+    const filled = filledHeight(Math.round(content), this.config ?? {});
+    const spare = Math.max(0, Math.floor(filled - content));
+    if (filled !== this.filled) this.filled = filled;
+    if (spare !== this.spare) this.spare = spare;
   }
   /**
    * Held to a height, the stops share it, but none is squeezed below its next departure and the first row after it,
@@ -1440,8 +1517,10 @@ var DeparturesCard = class extends i4 {
     ];
     const height = heightStyle(this.config, this.layout, this.minimumHeight());
     const attribution = attributions.join(" \xB7 ");
+    const classes = [this.config.full_texts && "full", height && "held", this.config.title && "titled"].filter(Boolean).join(" ");
+    const style = height || (this.filled ? `min-height: ${this.filled}px; --departures-spare: ${this.spare}px` : "");
     return b2`
-            <ha-card class="${this.config.full_texts ? "full" : ""} ${height ? "held" : ""}" style=${height}>
+            <ha-card class=${classes} style=${style}>
                 ${this.config.title ? b2`<h1 class="card-title" title=${this.config.title}>${this.config.title}</h1>` : A}
                 <div class="sections">${this.combines ? this.combined(sections) : sections.map((section) => this.section(section))}</div>
                 ${attribution ? b2`<div class="attribution" title=${attribution}>${attribution}</div>` : A}
@@ -1682,12 +1761,13 @@ var DeparturesCard = class extends i4 {
                 }
 
                 /*
-                 * The heights step in units of 32 px, half a row of a sections view (56 px and an 8 px gap), so the card
-                 * fills whole grid rows: with no title, a stop and its next departure take 150 px with the padding and the
-                 * attribution, each later departure 32, the title 32 and each stop under another 128.
+                 * The heights step in units of 32 px, half a row of a sections view (56 px and an 8 px gap): each later
+                 * departure 32, the title 32 and each stop under another 128. The card ends on a half row or a whole one by
+                 * its content, and fillRows rounds it to whole rows unless row_step is half. The room that leaves goes under
+                 * the title, or at the top without one.
                  */
                 .card-title {
-                    margin: 0 0 4px;
+                    margin: 0 0 calc(4px + var(--departures-spare, 0px));
                     font-size: var(--ha-card-header-font-size, 24px);
                     font-weight: var(--ha-font-weight-normal, 400);
                     line-height: 28px;
@@ -1696,6 +1776,10 @@ var DeparturesCard = class extends i4 {
                 .sections {
                     display: grid;
                     grid-template-columns: minmax(0, 1fr);
+                }
+
+                ha-card:not(.titled) > .sections {
+                    margin-top: var(--departures-spare, 0px);
                 }
 
                 section + section {
@@ -2282,6 +2366,12 @@ __decorateClass([
 __decorateClass([
   r5()
 ], DeparturesCard.prototype, "config", 2);
+__decorateClass([
+  r5()
+], DeparturesCard.prototype, "filled", 2);
+__decorateClass([
+  r5()
+], DeparturesCard.prototype, "spare", 2);
 DeparturesCard = __decorateClass([
   t3("departures-card")
 ], DeparturesCard);
