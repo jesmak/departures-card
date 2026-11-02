@@ -105,8 +105,8 @@ Everything can be set in the card's visual editor.
   line, and the stop's own notices, such as track works with buses replacing trains, each on a line of its own under its
   name. A notice cut short shows in full when the mouse is over it.
 
-<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-light.png#gh-light-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice at the end of its line, and the rows below with the same notice under the departure it concerns">
-<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-dark.png#gh-dark-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice at the end of its line, and the rows below with the same notice under the departure it concerns">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-light.png#gh-light-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice at the end of its line, and in the rows below the departure it concerns on two lines, the notice beside its time and line">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-dark.png#gh-dark-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice at the end of its line, and in the rows below the departure it concerns on two lines, the notice beside its time and line">
 
 <img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/airport-light.png#gh-light-mode-only" width="510" alt="An airport's departures and arrivals as one list, each flight with a takeoff or landing icon, the next departure large, two landed flights dimmed with their halls, and a cancelled flight with an outlined badge">
 <img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/airport-dark.png#gh-dark-mode-only" width="510" alt="An airport's departures and arrivals as one list, each flight with a takeoff or landing icon, the next departure large, two landed flights dimmed with their halls, and a cancelled flight with an outlined badge">
@@ -118,36 +118,35 @@ why.
 ## Sizes
 
 In a sections view the card takes a whole section by default and can be made as narrow as three quarters of one. Two
-stops sit side by side once the card is 620 px wide, which in a sections view takes a section spanning two columns.
-With `combine` they are one list at any width. The stop's name wraps rather than being cut, unless the card is held to
-a height without `full_texts`, and so does a line known by a long name rather than a number, inside its badge. Times,
-delays, tracks, platforms and gates are never cut. A later departure stays on one line while its destination has room,
-and moves its delay, notice and platform to the next line when it hasn't.
+stops sit side by side once the card is 620 px wide. With `combine` they are one list at any width. The stop's name
+wraps rather than being cut, unless the card is held to a height without `full_texts`, and so does a line known by a
+long name rather than a number, inside its badge. Times, delays, tracks, platforms and gates are never cut.
 
-On a narrow card, below 400 px, the large departure's destination goes under its badge and countdown, and every later
-departure takes two lines whatever it shows, unless `full_texts` lets its texts wrap. The first has its time and line
-with any word such as Landed or Cancelled, and the second its destination with its delay and track. That keeps every
-departure the same height as the data changes.
+A departure stays on one line while everything it shows fits there. When it doesn't, the next departure's destination
+goes under its badge and countdown, and a later departure takes two lines. The first has its time and line with any
+word such as Landed or Cancelled, and the second its destination with its delay and track. So a departure's height
+can change with what it shows, and on automatic rows the card can take a row more or less as the departures change.
 
-The subtitle, the notices, the next departure's destination and a narrow card's other destinations and words such as
-Landed are cut short to keep the card compact, so the next departure always takes two lines and each of the stop's
-notices one. A text cut short shows in full when the mouse is over it. Set `full_texts: true` to show them in full.
+The subtitle, the notices, the next departure's destination and, on a departure split onto two lines, the destination
+and words such as Landed are cut short to keep the card compact, so a later departure is never more than two lines and
+each of the stop's notices one. A text cut short shows in full when the mouse is over it. Set `full_texts: true` to show
+them in full.
 
 Held to a height, the card keeps its title, its attribution and each stop's name and subtitle to one line, cut short
 with an ellipsis when they are longer, unless `full_texts` shows them in full. The least it gets keeps every stop's
-next departure and the first departure after it in view, laid out as on a narrow card, since a section can be that
-narrow on a phone. A stop's notices, texts shown in full, the line about a sensor that can't be shown and a long line
-name wrapping on a card inside another card, narrower than a section allows, take room of their own, and the later
-departures scroll under them.
+next departure and the first departure after it in view, with room for each to be split. A stop's notices, texts shown in full,
+the line about a sensor that can't be shown and a long line name wrapping on a card inside another card, narrower than
+a section allows, take room of their own, and the later departures scroll under them.
 
 The card's parts are sized in half rows of a sections view. A stop with four departures takes four rows, and two more
-departures take one more row. A title or a stop's notice takes half a row, as does each departure. On a narrow card each
-later departure takes a whole row, and a stop under another leaves half a row. On automatic rows the card ends on a
+departures take one more row. A title or a stop's notice takes half a row, as does each departure. A later departure on two
+lines takes a whole row, as does a next departure whose destination goes under its badge, and a stop under another
+leaves half a row. On automatic rows the card ends on a
 whole row, with any half row left over under the title, or at the top without one. With `row_step: half` it ends on the
 half row its parts end on.
 
-<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/narrow-light.png#gh-light-mode-only" width="250" alt="A bus stop on a narrow card, the destination under the line and countdown, and each later departure on two lines, its time and line above its destination and delay">
-<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/narrow-dark.png#gh-dark-mode-only" width="250" alt="A bus stop on a narrow card, the destination under the line and countdown, and each later departure on two lines, its time and line above its destination and delay">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/narrow-light.png#gh-light-mode-only" width="250" alt="A bus stop on a narrow card, the destination under the line and countdown, a later departure with a notice on two lines, its time, line and notice above its destination and delay, and the others on one">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/narrow-dark.png#gh-dark-mode-only" width="250" alt="A bus stop on a narrow card, the destination under the line and countdown, a later departure with a notice on two lines, its time, line and notice above its destination and delay, and the others on one">
 
 In the `fixed` and `max` height modes, or with a number of rows given to the card in a sections view, the title, the
 data's attribution and each stop's name, notices and next departure stay where they are, and only the stop's later

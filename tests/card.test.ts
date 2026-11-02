@@ -529,9 +529,9 @@ describe("the card's height", () => {
         expect(element.shadowRoot!.querySelector("ha-card")?.getAttribute("style") ?? "").toBe(style);
     });
 
-    // The border and padding (34 px), a title on one line (32), the attribution (27) and, as on a narrow card, every
-    // stop's heading and next departure (106) with the first row after them on its two lines (81), and the divider
-    // between stops (37). A section can be narrow at any column count, so the narrow layout is always the one counted.
+    // The border and padding (34 px), a title on one line (32), the attribution (27) and, split as they may be at the
+    // narrowest the columns get, every stop's heading and next departure (106) with the first row after them on its two
+    // lines (81), and the divider between stops (37).
     it.each([
         ["one stop", {}, 248, 4],
         ["a title", { title: "Lähdöt" }, 280, 5],
@@ -888,5 +888,200 @@ describe("redrawing for a new hass", () => {
         element.hass = change(element.hass!);
         await element.updateComplete;
         expect(render).toHaveBeenCalledTimes(renders);
+    });
+});
+
+describe("splitting a departure onto two lines", () => {
+    // happy-dom lays nothing out, so each line is drawn from 0 to ONE_LINE, and its parts, while the card measures, end
+    // where its width on one line says, and start where `starts` says, past its left side in a right-to-left language.
+    const ONE_LINE = 300;
+    const natural = new Map<Element, number>();
+    const starts = new Map<Element, number>();
+    let cardWidth = 340;
+    let splitWhileMeasuring = false;
+    const own = (name: string) => Object.getOwnPropertyDescriptor(HTMLElement.prototype, name);
+    const saved = { clientWidth: own("clientWidth"), getBoundingClientRect: own("getBoundingClientRect") };
+    const isLine = (element: Element | null) => !!element?.matches(".next, .row");
+
+    beforeEach(() => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+        natural.clear();
+        starts.clear();
+        cardWidth = 340;
+        splitWhileMeasuring = false;
+        Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+            configurable: true,
+            get(this: HTMLElement) {
+                return this.tagName === "HA-CARD" ? cardWidth : ONE_LINE;
+            },
+        });
+        Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
+            configurable: true,
+            writable: true,
+            value(this: HTMLElement) {
+                let [left, right] = [0, 0];
+                if (isLine(this)) {
+                    right = ONE_LINE;
+                } else if (isLine(this.parentElement) && this.closest("ha-card")?.hasAttribute("data-measuring")) {
+                    splitWhileMeasuring ||= this.parentElement!.classList.contains("split");
+                    left = starts.get(this.parentElement!) ?? 0;
+                    right = natural.get(this.parentElement!) ?? ONE_LINE;
+                }
+                return { left, right, width: right - left, top: 0, bottom: 0, height: 0 } as DOMRect;
+            },
+        });
+    });
+
+    afterEach(() => {
+        for (const [name, descriptor] of Object.entries(saved)) {
+            if (descriptor) {
+                Object.defineProperty(HTMLElement.prototype, name, descriptor);
+            } else {
+                delete (HTMLElement.prototype as unknown as Record<string, unknown>)[name];
+            }
+        }
+        vi.useRealTimers();
+        document.body.innerHTML = "";
+    });
+
+    async function stop(): Promise<DeparturesCard> {
+        return card(
+            hass({
+                "sensor.kauppatori": [
+                    departure("a", 4, { headsign: "Kivisalmi-Keskusta" }),
+                    departure("b", 12, { notice: "Kulkee poikkeusreittiä katutöiden vuoksi" }),
+                    departure("c", 20),
+                ],
+            }),
+            {},
+        );
+    }
+
+    function lines(element: DeparturesCard): HTMLElement[] {
+        return [...element.shadowRoot!.querySelectorAll<HTMLElement>(".next, .row")];
+    }
+
+    function split(element: DeparturesCard): string[] {
+        (element as unknown as { splitLines(): void }).splitLines();
+        return lines(element).map((line) => (line.classList.contains("split") ? "split" : "one line"));
+    }
+
+    // Which lines are wider on one line than they are drawn, the next departure first.
+    it.each<[string, boolean[], string[]]>([
+        ["every one fits", [false, false, false], ["one line", "one line", "one line"]],
+        ["the next departure doesn't fit", [true, false, false], ["split", "one line", "one line"]],
+        ["a later departure doesn't fit", [false, true, false], ["one line", "split", "one line"]],
+        ["none fits", [true, true, true], ["split", "split", "split"]],
+    ])("keeps a departure on one line while it fits, and splits it when %s", async (_name, over, expected) => {
+        const element = await stop();
+        lines(element).forEach((line, index) => natural.set(line, ONE_LINE + (over[index] ? 0.4 : 0)));
+        expect(split(element)).toEqual(expected);
+        // A line already split is measured on one line again, so it goes back to one line when it fits once more.
+        lines(element).forEach((line) => natural.set(line, ONE_LINE));
+        expect(split(element)).toEqual(["one line", "one line", "one line"]);
+        expect(splitWhileMeasuring).toBe(false);
+    });
+
+    it("splits a departure again after the card is drawn afresh", async () => {
+        const element = await stop();
+        natural.set(lines(element)[1], ONE_LINE + 40);
+        split(element);
+        // A departure cancelled since writes its row's class afresh, and the card measures it again once drawn.
+        element.hass = hass({
+            "sensor.kauppatori": [
+                departure("a", 4, { headsign: "Kivisalmi-Keskusta" }),
+                departure("b", 12, { notice: "Kulkee poikkeusreittiä katutöiden vuoksi", cancelled: true }),
+                departure("c", 20),
+            ],
+        });
+        await element.updateComplete;
+        expect(lines(element)[1].classList.contains("cancelled")).toBe(true);
+        expect(lines(element).map((line) => line.classList.contains("split"))).toEqual([false, true, false]);
+    });
+
+    it("measures nothing while the card has no width", async () => {
+        const element = await stop();
+        cardWidth = 0;
+        lines(element).forEach((line) => natural.set(line, ONE_LINE + 40));
+        expect(split(element)).toEqual(["one line", "one line", "one line"]);
+    });
+
+    it.each<[string, number, number, string]>([
+        ["a later departure within the slack on its right", 2, ONE_LINE + 0.005, "one line"],
+        ["a later departure just past the slack on its right", 2, ONE_LINE + 0.02, "split"],
+        ["the next departure just past the slack on its right", 0, ONE_LINE + 0.02, "split"],
+        ["a later departure within the slack on its left", 2, -0.005, "one line"],
+        ["a later departure just past the slack on its left", 2, -0.02, "split"],
+        ["the next departure just past the slack on its left", 0, -0.02, "split"],
+        ["the next departure within the slack on its right", 0, ONE_LINE + 0.005, "one line"],
+        ["the next departure within the slack on its left", 0, -0.005, "one line"],
+    ])("measures to a hundredth of a pixel on both sides, %s", async (_name, index, edge, expected) => {
+        const element = await stop();
+        const line = lines(element)[index];
+        if (edge < 0) {
+            starts.set(line, edge);
+        } else {
+            natural.set(line, edge);
+        }
+        expect(split(element)[index]).toBe(expected);
+    });
+
+    it("splits a line that runs past its left side, as one does in a right-to-left language", async () => {
+        const element = await stop();
+        starts.set(lines(element)[2], -0.4);
+        expect(split(element)).toEqual(["one line", "one line", "split"]);
+    });
+
+    it("holds every line to its layout height while it measures, so nothing around the card moves", async () => {
+        const element = await stop();
+        const card = element.shadowRoot!.querySelector("ha-card")!;
+        const drawn = new Map(lines(element).map((line, index) => [line, ["76px", "64px", "32px"][index]]));
+        const real = window.getComputedStyle.bind(window);
+        vi.spyOn(window, "getComputedStyle").mockImplementation((target, pseudo) =>
+            drawn.has(target as HTMLElement) ? ({ height: drawn.get(target as HTMLElement) } as CSSStyleDeclaration) : real(target, pseudo),
+        );
+        const held: string[] = [];
+        for (const line of lines(element)) {
+            const box = line.getBoundingClientRect.bind(line);
+            line.getBoundingClientRect = () => {
+                if (card.hasAttribute("data-measuring")) {
+                    held.push(line.style.height);
+                }
+                return box();
+            };
+        }
+        split(element);
+        vi.restoreAllMocks();
+        expect(held).toEqual(["76px", "64px", "32px"]);
+        expect(lines(element).map((line) => line.style.height)).toEqual(["", "", ""]);
+    });
+
+    it("sizes a row with its padding, which measuring changes, as its height is held at the height it is drawn at", () => {
+        const css = [(customElements.get("departures-card") as unknown as { styles: unknown }).styles]
+            .flat(3)
+            .map((style) => String((style as { cssText?: string }).cssText ?? ""))
+            .join("\n");
+        expect(css).toMatch(/\n\s*\.row \{[^}]*box-sizing: border-box;/);
+    });
+
+    it("draws a line split again as it was measured when the card is drawn afresh, before it measures again", async () => {
+        const element = await stop();
+        natural.set(lines(element)[1], ONE_LINE + 40);
+        split(element);
+        // A render that rewrites the row's class, as a cancellation does, keeps its split rather than dropping it.
+        (element as unknown as { splitLines(): void }).splitLines = () => {};
+        element.hass = hass({
+            "sensor.kauppatori": [
+                departure("a", 4, { headsign: "Kivisalmi-Keskusta" }),
+                departure("b", 12, { notice: "Kulkee poikkeusreittiä katutöiden vuoksi", cancelled: true }),
+                departure("c", 20),
+            ],
+        });
+        await element.updateComplete;
+        expect(lines(element).map((line) => [line.classList.contains("cancelled"), line.classList.contains("split")])).toEqual([
+            [false, false],
+            [true, true],
+            [false, false],
+        ]);
     });
 });
