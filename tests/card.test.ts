@@ -523,7 +523,12 @@ describe("the card's height", () => {
             "max-height: 400px",
         ],
         ["grid rows in a sections view", "grid", { height: 300, grid_options: { rows: 6 } }, "height: 100%"],
-        ["the mode when the grid rows are automatic", "grid", { max_height: 400, grid_options: { rows: "auto" } }, "max-height: 400px"],
+        [
+            "the mode rounded down to the rows when the grid rows are automatic",
+            "grid",
+            { max_height: 400, grid_options: { rows: "auto" } },
+            "max-height: 376px",
+        ],
     ])("sizes itself by %s", async (_name, layout, extra, style) => {
         const element = await card(hass({ "sensor.kauppatori": [departure("a", 11)] }), extra, layout);
         expect(element.shadowRoot!.querySelector("ha-card")?.getAttribute("style") ?? "").toBe(style);
@@ -723,6 +728,21 @@ describe("the card's height", () => {
         ["half a row short, kept there with half rows", "grid", { row_step: "half" }, 199, "min-height: 216px; --departures-spare: 0px"],
         ["not outside a sections view", undefined, {}, 199, ""],
         ["not when held to a height", "grid", { height: 400 }, 199, "height: 400px"],
+        [
+            "under its limit, on the rows its content needs",
+            "grid",
+            { max_height: 400 },
+            199,
+            "max-height: 376px; min-height: 248px; --departures-spare: 32px",
+        ],
+        [
+            "over its limit, on the limit rounded down to the rows",
+            "grid",
+            { max_height: 400 },
+            900,
+            "max-height: 376px; min-height: 376px; --departures-spare: 0px",
+        ],
+        ["up to its limit as set outside a sections view", undefined, { max_height: 400 }, 199, "max-height: 400px"],
     ])("ends %s", async (_name, layout, extra, bottom, style) => {
         const element = await card(hass({}), extra, layout);
         const haCard = element.shadowRoot!.querySelector<HTMLElement>("ha-card")!;

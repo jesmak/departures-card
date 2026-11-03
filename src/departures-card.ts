@@ -29,7 +29,7 @@ import "./editor";
 import { ScrollFade, fadeStyles } from "./fade";
 import type { HassEntity, HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
-import { filledHeight, validRowStep } from "./rows";
+import { fillLimit, filledHeight, filledStyle, validRowStep } from "./rows";
 import { browserLanguage, translate } from "./localize/localize";
 import type { Departure, DeparturesCardConfig, SectionConfig, ShownDeparture } from "./types";
 
@@ -250,14 +250,15 @@ export class DeparturesCard extends LitElement {
 
     /**
      * On automatic rows in a sections view, the card takes the whole rows its content needs, or the half rows with
-     * `row_step: half`, so the cards under it stay on the rows. The content is measured to the end of the card's last
+     * `row_step: half`, so the cards under it stay on the rows, up to the limit of a card that grows up to one. The content is measured to the end of the card's last
      * part, never by the card's own height, which is at least the rows already taken, and less the room already put under
      * the title, as drawn.
      */
     private fillRows(): void {
         const card = this.renderRoot.querySelector<HTMLElement>("ha-card");
         const last = card?.querySelector<HTMLElement>(":scope > .attribution") ?? card?.querySelector<HTMLElement>(":scope > .sections");
-        if (!card || !last || !card.clientWidth || this.layout !== "grid" || card.classList.contains("held")) {
+        const limit = fillLimit(this.config ?? {}, this.layout, this.minimumHeight());
+        if (!card || !last || !card.clientWidth || !limit) {
             if (this.filled) this.filled = 0;
             if (this.spare) this.spare = 0;
             return;
@@ -276,7 +277,7 @@ export class DeparturesCard extends LitElement {
             (parseFloat(style.paddingBottom) || 0) +
             (parseFloat(style.borderBottomWidth) || 0) -
             Math.max(0, shown);
-        const filled = filledHeight(Math.round(content), this.config ?? {});
+        const filled = filledHeight(Math.round(content), this.config ?? {}, limit);
         const spare = Math.max(0, Math.floor(filled - content));
         if (filled !== this.filled) this.filled = filled;
         if (spare !== this.spare) this.spare = spare;
@@ -338,8 +339,11 @@ export class DeparturesCard extends LitElement {
         ];
         const height = heightStyle(this.config, this.layout, this.minimumHeight());
         const attribution = attributions.join(" · ");
-        const classes = [this.config.full_texts && "full", height && "held", this.config.title && "titled"].filter(Boolean).join(" ");
-        const style = height || (this.filled ? `min-height: ${this.filled}px; --departures-spare: ${this.spare}px` : "");
+        const classes = [this.config.full_texts && "full", height && "held", this.filled && "filled", this.config.title && "titled"]
+            .filter(Boolean)
+            .join(" ");
+        const filled = filledStyle(this.config, this.layout, this.minimumHeight(), this.filled);
+        const style = this.filled ? `${filled}; --departures-spare: ${this.spare}px` : filled;
         return html`
             <ha-card class=${classes} style=${style}>
                 ${this.config.title ? html`<h1 class="card-title" title=${this.config.title}>${this.config.title}</h1>` : nothing}
@@ -1197,6 +1201,12 @@ export class DeparturesCard extends LitElement {
                     min-height: 0;
                     overflow: hidden;
                     align-content: start;
+                }
+
+                /* Filling its rows up to a limit, the stops shrink but never grow, as the room left over goes under the
+                   title and fillRows would otherwise measure it as content, keeping the card from ever shrinking. */
+                .held.filled .sections {
+                    flex-grow: 0;
                 }
 
                 .held section {

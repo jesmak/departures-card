@@ -1,6 +1,7 @@
 /**
  * The card's visual editor: the title, the stops with their headings, how many departures each shows, cancelled ones,
- * notices, whether texts are shown in full, whether the stops are one list, and the card's height.
+ * notices, whether texts are shown in full, whether the stops are one list, and how the card rounds its height to the
+ * rows of a sections view. Its height mode is set in YAML only.
  */
 import { LitElement, css, html, nothing } from "lit";
 import type { CSSResultGroup, TemplateResult } from "lit";
@@ -9,7 +10,6 @@ import { customElement, property, state } from "lit/decorators.js";
 import { DEFAULT_DEPARTURES } from "./const";
 import { departuresSensors, sectionsOf } from "./departures";
 import type { HomeAssistant } from "./hass";
-import { heightData, heightSchema, tidyHeight } from "./height";
 import { rowStepData, rowStepSchema, tidyRowStep } from "./rows";
 import { browserLanguage, translate } from "./localize/localize";
 import type { DeparturesCardConfig, SectionConfig } from "./types";
@@ -66,7 +66,6 @@ function optionsSchema(config: DeparturesCardConfig, text: (key: string) => stri
                 { name: "combine", selector: { boolean: {} } },
             ],
         },
-        ...heightSchema(config, text),
         ...rowStepSchema(config, text),
     ];
 }
@@ -109,7 +108,7 @@ export class DeparturesCardEditor extends LitElement {
             return nothing;
         }
         // The form edits every stop as an object; plain entity ids are expanded for it.
-        const data = formData(rowStepData(heightData(this.config)));
+        const data = formData(rowStepData(this.config));
         // Two forms, so that the stops' helper, which Home Assistant's list of objects doesn't show, sits under the stops.
         return html`
             <ha-form
@@ -144,7 +143,7 @@ export class DeparturesCardEditor extends LitElement {
     }
 
     private valueChanged(event: CustomEvent<{ value: DeparturesCardConfig }>): void {
-        const config: DeparturesCardConfig = tidyRowStep(tidyHeight(event.detail.value));
+        const config: DeparturesCardConfig = tidyRowStep(event.detail.value);
         config.entities = compactSections((config.entities ?? []) as SectionConfig[]);
         if (!config.title) {
             delete config.title;
