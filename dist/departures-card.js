@@ -1311,11 +1311,8 @@ var ScrollFade = class {
 // src/departures-card.ts
 var TITLE_GAP_PX = 4;
 function overflows(line) {
-  const { left, right } = line.getBoundingClientRect();
-  return [...line.children].some((part) => {
-    const box = part.getBoundingClientRect();
-    return box.right > right + 0.01 || box.left < left - 0.01;
-  });
+  const { right } = line.getBoundingClientRect();
+  return [...line.children].some((part) => part.getBoundingClientRect().right > right + 0.01);
 }
 var DIRECTION_ICONS = {
   plane: { departing: "mdi:airplane-takeoff", arriving: "mdi:airplane-landing" },

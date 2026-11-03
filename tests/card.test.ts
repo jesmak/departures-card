@@ -893,10 +893,9 @@ describe("redrawing for a new hass", () => {
 
 describe("splitting a departure onto two lines", () => {
     // happy-dom lays nothing out, so each line is drawn from 0 to ONE_LINE, and its parts, while the card measures, end
-    // where its width on one line says, and start where `starts` says, past its left side in a right-to-left language.
+    // where its width on one line says.
     const ONE_LINE = 300;
     const natural = new Map<Element, number>();
-    const starts = new Map<Element, number>();
     let cardWidth = 340;
     let splitWhileMeasuring = false;
     const own = (name: string) => Object.getOwnPropertyDescriptor(HTMLElement.prototype, name);
@@ -906,7 +905,6 @@ describe("splitting a departure onto two lines", () => {
     beforeEach(() => {
         vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
         natural.clear();
-        starts.clear();
         cardWidth = 340;
         splitWhileMeasuring = false;
         Object.defineProperty(HTMLElement.prototype, "clientWidth", {
@@ -919,15 +917,14 @@ describe("splitting a departure onto two lines", () => {
             configurable: true,
             writable: true,
             value(this: HTMLElement) {
-                let [left, right] = [0, 0];
+                let right = 0;
                 if (isLine(this)) {
                     right = ONE_LINE;
                 } else if (isLine(this.parentElement) && this.closest("ha-card")?.hasAttribute("data-measuring")) {
                     splitWhileMeasuring ||= this.parentElement!.classList.contains("split");
-                    left = starts.get(this.parentElement!) ?? 0;
                     right = natural.get(this.parentElement!) ?? ONE_LINE;
                 }
-                return { left, right, width: right - left, top: 0, bottom: 0, height: 0 } as DOMRect;
+                return { left: 0, right, width: right, top: 0, bottom: 0, height: 0 } as DOMRect;
             },
         });
     });
@@ -1007,29 +1004,14 @@ describe("splitting a departure onto two lines", () => {
     });
 
     it.each<[string, number, number, string]>([
-        ["a later departure within the slack on its right", 2, ONE_LINE + 0.005, "one line"],
-        ["a later departure just past the slack on its right", 2, ONE_LINE + 0.02, "split"],
-        ["the next departure just past the slack on its right", 0, ONE_LINE + 0.02, "split"],
-        ["a later departure within the slack on its left", 2, -0.005, "one line"],
-        ["a later departure just past the slack on its left", 2, -0.02, "split"],
-        ["the next departure just past the slack on its left", 0, -0.02, "split"],
-        ["the next departure within the slack on its right", 0, ONE_LINE + 0.005, "one line"],
-        ["the next departure within the slack on its left", 0, -0.005, "one line"],
-    ])("measures to a hundredth of a pixel on both sides, %s", async (_name, index, edge, expected) => {
+        ["a later departure within the slack", 2, ONE_LINE + 0.005, "one line"],
+        ["a later departure just past the slack", 2, ONE_LINE + 0.02, "split"],
+        ["the next departure just past the slack", 0, ONE_LINE + 0.02, "split"],
+        ["the next departure within the slack", 0, ONE_LINE + 0.005, "one line"],
+    ])("measures to a hundredth of a pixel, %s", async (_name, index, edge, expected) => {
         const element = await stop();
-        const line = lines(element)[index];
-        if (edge < 0) {
-            starts.set(line, edge);
-        } else {
-            natural.set(line, edge);
-        }
+        natural.set(lines(element)[index], edge);
         expect(split(element)[index]).toBe(expected);
-    });
-
-    it("splits a line that runs past its left side, as one does in a right-to-left language", async () => {
-        const element = await stop();
-        starts.set(lines(element)[2], -0.4);
-        expect(split(element)).toEqual(["one line", "one line", "split"]);
     });
 
     it("holds every line to its layout height while it measures, so nothing around the card moves", async () => {
