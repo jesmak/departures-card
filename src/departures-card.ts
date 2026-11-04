@@ -1142,12 +1142,15 @@ export class DeparturesCard extends LitElement {
                     overflow-wrap: anywhere;
                 }
 
+                /* A flex box, as the inline-flex ha-svg-icon inside it would otherwise sit on a 20 px line of its own and
+                   drop 2.5 px. The margin centres the triangle on the capitals, which sit 1 px above the line's middle. */
                 .stop-notice ha-icon {
                     --mdc-icon-size: 16px;
+                    display: flex;
                     flex: none;
                     width: 16px;
                     height: 16px;
-                    margin-top: 2px;
+                    margin-top: 1px;
                     color: var(--warning-color, #b45309);
                 }
 

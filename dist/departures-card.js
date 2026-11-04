@@ -1,4 +1,4 @@
-/*! departures-card 1.4.0 | MIT License */
+/*! departures-card 1.4.1 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,7 +711,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.4.0";
+var CARD_VERSION = "1.4.1";
 var DEPARTURES_VERSION = 1;
 var DEFAULT_DEPARTURES = 4;
 var GONE_AFTER_MS = 6e4;
@@ -2268,12 +2268,15 @@ var DeparturesCard = class extends i4 {
                     overflow-wrap: anywhere;
                 }
 
+                /* A flex box, as the inline-flex ha-svg-icon inside it would otherwise sit on a 20 px line of its own and
+                   drop 2.5 px. The margin centres the triangle on the capitals, which sit 1 px above the line's middle. */
                 .stop-notice ha-icon {
                     --mdc-icon-size: 16px;
+                    display: flex;
                     flex: none;
                     width: 16px;
                     height: 16px;
-                    margin-top: 2px;
+                    margin-top: 1px;
                     color: var(--warning-color, #b45309);
                 }
 
