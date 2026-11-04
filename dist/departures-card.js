@@ -1102,6 +1102,19 @@ function compactSections(sections) {
     return entry.name || entry.subtitle ? entry : entry.entity;
   });
 }
+function configFromForm(value) {
+  const config = tidyRowStep(value);
+  config.entities = compactSections(config.entities ?? []);
+  if (!config.title) {
+    delete config.title;
+  }
+  for (const [key, defaultValue] of Object.entries(DEFAULTS)) {
+    if (config[key] === defaultValue || config[key] === void 0 || config[key] === null || config[key] === "") {
+      delete config[key];
+    }
+  }
+  return config;
+}
 var DeparturesCardEditor = class extends i4 {
   constructor() {
     super(...arguments);
@@ -1146,16 +1159,7 @@ var DeparturesCardEditor = class extends i4 {
         `;
   }
   valueChanged(event) {
-    const config = tidyRowStep(event.detail.value);
-    config.entities = compactSections(config.entities ?? []);
-    if (!config.title) {
-      delete config.title;
-    }
-    for (const [key, value] of Object.entries(DEFAULTS)) {
-      if (config[key] === value || config[key] === void 0 || config[key] === null || config[key] === "") {
-        delete config[key];
-      }
-    }
+    const config = configFromForm(event.detail.value);
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
   }
   text(key) {

@@ -94,6 +94,22 @@ export function compactSections(sections: SectionConfig[]): Array<string | Secti
     });
 }
 
+/** The form's values as the card's configuration, with the stops compacted and empty values and defaults left out. */
+export function configFromForm(value: DeparturesCardConfig): DeparturesCardConfig {
+    const config: DeparturesCardConfig = tidyRowStep(value);
+    config.entities = compactSections((config.entities ?? []) as SectionConfig[]);
+    if (!config.title) {
+        delete config.title;
+    }
+    // The defaults are shown in the form but left out of the configuration.
+    for (const [key, defaultValue] of Object.entries(DEFAULTS)) {
+        if (config[key] === defaultValue || config[key] === undefined || config[key] === null || config[key] === "") {
+            delete config[key];
+        }
+    }
+    return config;
+}
+
 @customElement("departures-card-editor")
 export class DeparturesCardEditor extends LitElement {
     @property({ attribute: false }) public hass?: HomeAssistant;
@@ -143,17 +159,7 @@ export class DeparturesCardEditor extends LitElement {
     }
 
     private valueChanged(event: CustomEvent<{ value: DeparturesCardConfig }>): void {
-        const config: DeparturesCardConfig = tidyRowStep(event.detail.value);
-        config.entities = compactSections((config.entities ?? []) as SectionConfig[]);
-        if (!config.title) {
-            delete config.title;
-        }
-        // The defaults are shown in the form but left out of the configuration.
-        for (const [key, value] of Object.entries(DEFAULTS)) {
-            if (config[key] === value || config[key] === undefined || config[key] === null || config[key] === "") {
-                delete config[key];
-            }
-        }
+        const config = configFromForm(event.detail.value);
         this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
     }
 

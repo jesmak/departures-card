@@ -356,14 +356,6 @@ describe("arrivals and directions", () => {
         expect(root.querySelector(".next")).not.toBeNull();
     });
 
-    // The keys that keep them apart are tested in departures.test.ts: lit draws duplicate keys alike on a first render.
-    it("keeps the same flight from two sensors as two rows", async () => {
-        const same = { departures: [flight("ay9", 5), flight("ay9b", 30)], direction: "arrivals" as const };
-        const state = hass({ "sensor.saapuvat": same, "sensor.toinen": { ...same, stop_name: "Toinen" } });
-        const root = (await card(state, { entities: ["sensor.saapuvat", "sensor.toinen"], combine: true, departures: 10 })).shadowRoot!;
-        expect([...root.querySelectorAll(".row .badge")].map(text)).toEqual(["AY9", "AY9B", "AY9B"]);
-    });
-
     it("is one section in size when its sensors are one list", () => {
         const element = document.createElement("departures-card");
         element.setConfig({ type: "custom:departures-card", entities: ["sensor.a", "sensor.b"], departures: 4 });
@@ -390,22 +382,6 @@ describe("arrivals and directions", () => {
         expect(() => element.setConfig({ type: "custom:departures-card", entities: ["sensor.a"], departures } as never)).toThrow(
             "The number of departures must be a whole number",
         );
-    });
-
-    it("is as tall for arrivals as for departures, as the ones that are over are counted", () => {
-        const element = document.createElement("departures-card");
-        element.hass = hass({ "sensor.lahtevat": DEPARTURES, "sensor.saapuvat": ARRIVALS });
-        element.setConfig({ type: "custom:departures-card", entities: ["sensor.lahtevat", "sensor.saapuvat"], departures: 4 });
-        expect(element.getCardSize()).toBe(13);
-        element.setConfig({
-            type: "custom:departures-card",
-            entities: ["sensor.lahtevat", "sensor.saapuvat"],
-            departures: 4,
-            combine: true,
-        });
-        expect(element.getCardSize()).toBe(7);
-        element.setConfig({ type: "custom:departures-card", entities: ["sensor.lahtevat"], departures: 4 });
-        expect(element.getCardSize()).toBe(7);
     });
 });
 

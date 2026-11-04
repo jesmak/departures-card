@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "../src/departures-card";
 import type { DeparturesCard } from "../src/departures-card";
-import { compactSections, formData } from "../src/editor";
+import { compactSections, configFromForm, formData } from "../src/editor";
 import type { HomeAssistant } from "../src/hass";
 import { browserLanguage, translate } from "../src/localize/localize";
 import type { Departure, DeparturesCardConfig } from "../src/types";
@@ -369,13 +369,18 @@ describe("departures-card", () => {
         expect(text(root.querySelector(".name"))).toBe("Kauppatori");
     });
 
-    it("cuts the subtitle short unless texts are shown in full, and is never narrower than three quarters of a section", async () => {
+    it("marks the card for texts in full only when full_texts is set", async () => {
         const state = hass({ "sensor.kauppatori": [departure("a", 5)] });
         const cut = await card(state, { entities: [{ entity: "sensor.kauppatori", subtitle: "keskustaan" }] });
         expect(cut.shadowRoot!.querySelector("ha-card")?.classList.contains("full")).toBe(false);
         const full = await card(state, { entities: [{ entity: "sensor.kauppatori", subtitle: "keskustaan" }], full_texts: true });
         expect(full.shadowRoot!.querySelector("ha-card")?.classList.contains("full")).toBe(true);
-        expect(full.getGridOptions()).toEqual({ columns: 12, min_columns: 9, rows: "auto", min_rows: 4 });
+    });
+
+    it("takes a whole section by default and is never narrower than three quarters of one", async () => {
+        const state = hass({ "sensor.kauppatori": [departure("a", 5)] });
+        const element = await card(state, { entities: ["sensor.kauppatori"] });
+        expect(element.getGridOptions()).toEqual({ columns: 12, min_columns: 9, rows: "auto", min_rows: 4 });
     });
 
     // Every text the card can cut short carries its own text as a tooltip, in every state, so it shows in full when the
@@ -876,6 +881,62 @@ describe("the editor", () => {
 
     it("takes one sensor written without a list, as the card does", () => {
         expect(formData({ type: "custom:departures-card", entities: "sensor.a" } as never).entities).toEqual([{ entity: "sensor.a" }]);
+    });
+
+    it("writes only what differs from the defaults, and the stops compacted", () => {
+        const form = formData({ type: "custom:departures-card", entities: ["sensor.a"] });
+        expect(configFromForm({ ...form, title: "", entities: [{ entity: "sensor.a" }] } as never)).toEqual({
+            type: "custom:departures-card",
+            entities: ["sensor.a"],
+        });
+        expect(
+            configFromForm({
+                ...form,
+                title: "Bussit",
+                departures: 6,
+                combine: true,
+                full_texts: null,
+                show_notices: "",
+                row_step: "half",
+                entities: [{ entity: "sensor.a", name: "A", subtitle: "" }],
+            } as never),
+        ).toEqual({
+            type: "custom:departures-card",
+            title: "Bussit",
+            departures: 6,
+            combine: true,
+            row_step: "half",
+            entities: [{ entity: "sensor.a", name: "A" }],
+        });
+    });
+
+    it("drops whole rows, the default step, and the step of a card held to a fixed height", () => {
+        const base = { type: "custom:departures-card", entities: [{ entity: "sensor.a" }] };
+        expect(configFromForm({ ...base, row_step: "full" } as never)).not.toHaveProperty("row_step");
+        expect(configFromForm({ ...base, row_step: "half", height: 300 } as never)).not.toHaveProperty("row_step");
+        expect(configFromForm({ ...base, row_step: "half", height_mode: "max", height: 300, max_height: 400 } as never)).toHaveProperty(
+            "row_step",
+            "half",
+        );
+    });
+});
+
+describe("the countdown", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+        document.body.innerHTML = "";
+    });
+
+    it("runs on between the sensor's updates, and stops when the card is removed", async () => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date", "setInterval", "clearInterval"] });
+        const element = await card(hass({ "sensor.kauppatori": [departure("a", 10)] }), {});
+        const countdown = () => text(element.shadowRoot!.querySelector(".next .countdown"));
+        expect(countdown()).toBe("10 min");
+        await vi.advanceTimersByTimeAsync(60_000);
+        await element.updateComplete;
+        expect(countdown()).toBe("9 min");
+        element.remove();
+        expect(vi.getTimerCount()).toBe(0);
     });
 });
 
