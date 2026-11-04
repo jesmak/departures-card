@@ -65,26 +65,27 @@ that changes on its own, such as "in 4 min".
 
 ## Departures
 
-| Field       | Type     | Required | Meaning                                                                                                                                                                                                    |
-| ----------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`        | string   | **MUST** | Unique within the entity and stable between updates. Prefix it with the kind of identifier: `trip:HSL:1055_20261004_Ma_2_1645/2026-10-04`, `train:2026-10-04/45`.                                          |
-| `line`      | string   | **MUST** | What the line or train is called, short enough for a badge: `55`, `IC 45`, `M2`.                                                                                                                           |
-| `mode`      | string   | **MUST** | `bus`, `tram`, `metro`, `train`, `ferry`, `plane` or `other`. Picks the default colour. An unknown mode is shown as `other`.                                                                               |
-| `headsign`  | string   | SHOULD   | Where it's heading, as shown on the vehicle: `Koskela`, `Helsinki`.                                                                                                                                        |
-| `scheduled` | ISO 8601 | **MUST** | The timetabled departure time.                                                                                                                                                                             |
-| `estimated` | ISO 8601 | **MUST** | The live estimate when there is one, otherwise the same as `scheduled`. The card counts down to this.                                                                                                      |
-| `realtime`  | boolean  | SHOULD   | Whether `estimated` comes from live data. Missing means `false`. The card marks live times.                                                                                                                |
-| `delay`     | integer  | MAY      | Seconds behind the timetable; negative means early. Missing means 0. The card shows the delay in the minutes its clock times show, worked out from `scheduled` and `estimated`, so the two never disagree. |
-| `platform`  | string   | MAY      | Track, platform or gate, such as `3`, `B` or `28`.                                                                                                                                                         |
-| `cancelled` | boolean  | MAY      | The departure is cancelled. Missing means `false`.                                                                                                                                                         |
-| `arrived`   | boolean  | MAY      | An arrival has come in. Its `estimated` is then when it did, as near as the source knows. Missing means `false`. Only for an arrivals sensor.                                                              |
-| `notice`    | string   | MAY      | A short notice in the language the source was configured for, such as the reason for a cancellation: `Rolling stock`.                                                                                      |
-| `color`     | string   | MAY      | The line's own colour as a CSS hex colour, `#00985f`. Replaces the mode's default colour. The card picks a readable text colour for it.                                                                    |
+| Field       | Type     | Required | Meaning                                                                                                                                                                                                   |
+| ----------- | -------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`        | string   | **MUST** | Unique within the entity and stable between updates. Prefix it with the kind of identifier, such as `trip:HSL:1055_20261004_Ma_2_1645/2026-10-04` or `train:2026-10-04/45`.                               |
+| `line`      | string   | **MUST** | What the line or train is called, short enough for a badge, such as `55`, `IC 45` or `M2`.                                                                                                                |
+| `mode`      | string   | **MUST** | `bus`, `tram`, `metro`, `train`, `ferry`, `plane` or `other`. Picks the default colour. An unknown mode is shown as `other`.                                                                              |
+| `headsign`  | string   | SHOULD   | Where it's heading, as shown on the vehicle, such as `Koskela` or `Helsinki`.                                                                                                                             |
+| `scheduled` | ISO 8601 | **MUST** | The timetabled departure time.                                                                                                                                                                            |
+| `estimated` | ISO 8601 | **MUST** | The live estimate when there is one, otherwise the same as `scheduled`. The card counts down to this.                                                                                                     |
+| `realtime`  | boolean  | SHOULD   | Whether `estimated` comes from live data. Missing means `false`. The card marks live times.                                                                                                               |
+| `delay`     | integer  | MAY      | Seconds behind the timetable, negative when early. Missing means 0. The card shows the delay in the minutes its clock times show, worked out from `scheduled` and `estimated`, so the two never disagree. |
+| `platform`  | string   | MAY      | Track, platform or gate, such as `3`, `B` or `28`.                                                                                                                                                        |
+| `cancelled` | boolean  | MAY      | The departure is cancelled. Missing means `false`.                                                                                                                                                        |
+| `arrived`   | boolean  | MAY      | An arrival has come in. Its `estimated` is then when it did, as near as the source knows. Missing means `false`. Only for an arrivals sensor.                                                             |
+| `notice`    | string   | MAY      | A short notice in the language the source was configured for, such as the reason for a cancellation, `Rolling stock`.                                                                                     |
+| `color`     | string   | MAY      | The line's own colour as a CSS hex colour, `#00985f`. Replaces the mode's default colour. The card picks a readable text colour for it.                                                                   |
 
 Fields the card doesn't know are ignored.
 
-The card translates only what it renders itself: "now", minutes, clock times, delays, platforms and "cancelled".
-Everything else comes from the source in its own words: names, headsigns and notices.
+The card translates only what it renders itself, such as "now", minutes, clock times, delays, tracks, platforms,
+gates and halls, "cancelled", "landed" and "arrived", and the departures and arrivals headings. Everything else, such
+as names, headsigns and notices, comes from the source in its own words.
 
 ### How the card shows times
 
@@ -103,9 +104,8 @@ hall. A sensor that lists both directions is two sensors, one each, so no other 
 The card shows an arrival until half an hour past its `estimated` time, rather than the minute it gives a departure, so
 someone meeting it still sees it after it has come in. One with `arrived: true` shows when it came in, dimmed, with its
 delay and notice, and the card says it has arrived in its own words. A cancelled arrival stays as long. The card's count
-is of the arrivals still to come and not cancelled, and the cancelled ones among them are listed too. The latest two
-that are over, come in or cancelled and past their time, are listed besides them. The large one is the next arrival
-still to come that isn't cancelled. The card
+covers every arrival it lists. That is the large one, which is the next arrival still to come that isn't cancelled,
+the cancelled ones, and up to the latest two that are over, come in or cancelled and past their time. The card
 names a sensor's direction under its name when the sensor says one, and shows a plane's or a train's direction as an
 icon, always on the large one, and on every row in a list of both directions.
 
@@ -129,8 +129,8 @@ icon, always on the large one, and on every row in a list of both directions.
 - Sources **SHOULD NOT** give a cancelled departure a `notice` that only says it is cancelled. The card says it in its
   own language, so a notice of `Cancelled` would read "Cancelled, Cancelled". Give the reason, or leave the notice out.
 - Sources **SHOULD** let the user choose how many departures to list, and count only those not cancelled, listing the
-  cancelled ones among them too, as the card does, so a run of cancellations doesn't push the next departure off the
-  list. When fewer than that aren't cancelled, as in a strike, they **SHOULD** fill the list up to the number with the
+  cancelled ones among them too, so a run of cancellations doesn't push the next departure off the list. The card
+  counts the cancelled ones in its own number and shows at most that many, so a source listing more costs nothing. When fewer than that aren't cancelled, as in a strike, they **SHOULD** fill the list up to the number with the
   cancelled ones after, and no further. The card shows at most as many as the source provides.
 - Sources **SHOULD** refresh no more often than every 30 seconds.
 - Sources **SHOULD** leave out fields that have no value instead of writing `null`. The card treats `null` as

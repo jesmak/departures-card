@@ -255,6 +255,9 @@ the file HACS installs and is committed to the repository.
 | `src/departures-card.ts`    | The card itself                                            |
 | `src/editor.ts`             | The visual editor                                          |
 | `src/departures.ts`         | Reading the sensors, and the times, days and colours shown |
+| `src/height.ts`             | The height modes and the height they give the card         |
+| `src/rows.ts`               | Filling whole or half rows in a sections view              |
+| `src/fade.ts`               | The fades at the edges of a scrolling list                 |
 | `src/localize/languages/`   | The card's texts, one JSON file per language               |
 | `docs/departures-format.md` | The format the card reads                                  |
 | `docs/screenshots.json`     | The made-up data the README's screenshots are taken from   |
