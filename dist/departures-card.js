@@ -853,8 +853,17 @@ function validRowStep(config) {
   return config.row_step === void 0 || config.row_step === null || ROW_STEPS.includes(config.row_step);
 }
 var step = (config) => config.row_step === "half" ? ROW_PX / 2 : ROW_PX;
+var SLACK_PX = 0.01;
+function drawnScale(card) {
+  const layout = Number.parseFloat(getComputedStyle(card).width) || 0;
+  const drawn = card.getBoundingClientRect().width;
+  return layout > 0 && drawn > 0 ? drawn / layout : 1;
+}
 function filledHeight(content, config, limit = Infinity) {
-  return Math.min(Math.max(1, Math.ceil((content + ROW_GAP_PX) / step(config))) * step(config) - ROW_GAP_PX, limit);
+  return Math.min(Math.max(1, Math.ceil((content - SLACK_PX + ROW_GAP_PX) / step(config))) * step(config) - ROW_GAP_PX, limit);
+}
+function spareRoom(filled, content) {
+  return Math.max(0, Math.floor(filled - content + SLACK_PX));
 }
 function fillLimit(config, layout, minimum = 0) {
   const rows = config.grid_options ? config.grid_options.rows : config.layout_options?.grid_rows;
@@ -1466,9 +1475,9 @@ var DeparturesCard = class extends i4 {
     const title = card.querySelector(":scope > .card-title");
     const sections = card.querySelector(":scope > .sections");
     const shown = title ? (parseFloat(getComputedStyle(title).marginBottom) || 0) - TITLE_GAP_PX : sections ? parseFloat(getComputedStyle(sections).marginTop) || 0 : 0;
-    const content = last.getBoundingClientRect().bottom - card.getBoundingClientRect().top + (parseFloat(style.paddingBottom) || 0) + (parseFloat(style.borderBottomWidth) || 0) - Math.max(0, shown);
-    const filled = filledHeight(Math.round(content), this.config ?? {}, limit);
-    const spare = Math.max(0, Math.floor(filled - content));
+    const content = (last.getBoundingClientRect().bottom - card.getBoundingClientRect().top) / drawnScale(card) + (parseFloat(style.paddingBottom) || 0) + (parseFloat(style.borderBottomWidth) || 0) - Math.max(0, shown);
+    const filled = filledHeight(content, this.config ?? {}, limit);
+    const spare = spareRoom(filled, content);
     if (filled !== this.filled) this.filled = filled;
     if (spare !== this.spare) this.spare = spare;
   }

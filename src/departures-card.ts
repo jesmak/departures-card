@@ -29,7 +29,7 @@ import "./editor";
 import { ScrollFade, fadeStyles } from "./fade";
 import type { HassEntity, HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
-import { fillLimit, filledHeight, filledStyle, validRowStep } from "./rows";
+import { drawnScale, fillLimit, filledHeight, filledStyle, spareRoom, validRowStep } from "./rows";
 import { browserLanguage, translate } from "./localize/localize";
 import type { Departure, DeparturesCardConfig, SectionConfig, ShownDeparture } from "./types";
 
@@ -271,14 +271,14 @@ export class DeparturesCard extends LitElement {
             : sections
               ? parseFloat(getComputedStyle(sections).marginTop) || 0
               : 0;
+        // The drawn distance unscaled, as the padding and border added to it are the layout's.
         const content =
-            last.getBoundingClientRect().bottom -
-            card.getBoundingClientRect().top +
+            (last.getBoundingClientRect().bottom - card.getBoundingClientRect().top) / drawnScale(card) +
             (parseFloat(style.paddingBottom) || 0) +
             (parseFloat(style.borderBottomWidth) || 0) -
             Math.max(0, shown);
-        const filled = filledHeight(Math.round(content), this.config ?? {}, limit);
-        const spare = Math.max(0, Math.floor(filled - content));
+        const filled = filledHeight(content, this.config ?? {}, limit);
+        const spare = spareRoom(filled, content);
         if (filled !== this.filled) this.filled = filled;
         if (spare !== this.spare) this.spare = spare;
     }

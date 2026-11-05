@@ -768,6 +768,30 @@ describe("the card's height", () => {
         expect(haCard.getAttribute("style") ?? "").toBe(style);
     });
 
+    // The content is 120.4 px, a fraction over two rows, and then 216 px drawn at 0.8, as a dialog opening draws the card.
+    it.each([
+        ["a fraction of a pixel over a row, on the next one", 103.4, 1, "min-height: 184px; --departures-spare: 63px"],
+        ["drawn scaled, in the layout's pixels", 199, 0.8, "min-height: 248px; --departures-spare: 32px"],
+    ])("ends %s", async (_name, bottom, scale, style) => {
+        const element = await card(hass({}), {}, "grid");
+        const haCard = element.shadowRoot!.querySelector<HTMLElement>("ha-card")!;
+        Object.defineProperty(haCard, "clientWidth", { value: 454, configurable: true });
+        haCard.getBoundingClientRect = () => ({ top: 0, width: 454 * scale }) as DOMRect;
+        const last = haCard.querySelector<HTMLElement>(":scope > .attribution") ?? haCard.querySelector<HTMLElement>(":scope > .sections")!;
+        last.getBoundingClientRect = () => ({ bottom: bottom * scale }) as DOMRect;
+        vi.spyOn(window, "getComputedStyle").mockReturnValue({
+            paddingBottom: "16px",
+            borderBottomWidth: "1px",
+            marginBottom: "4px",
+            marginTop: "0px",
+            width: "454px",
+        } as CSSStyleDeclaration);
+        (element as unknown as { fillRows(): void }).fillRows();
+        vi.restoreAllMocks();
+        await element.updateComplete;
+        expect(haCard.getAttribute("style") ?? "").toBe(style);
+    });
+
     it("keeps a held stop's next departure and first later row in view, and only a stop that has later rows", async () => {
         vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
         vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
