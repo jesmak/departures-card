@@ -3,7 +3,7 @@
 Home Assistant dashboard card for the next departures from stops, railway stations and airports, from any sensor in
 the departures format.
 
-[![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![Marketplace][marketplace-shield]][marketplace] [![License][license-shield]](LICENSE)
+[![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![Downloads][downloads-shield]][releases] [![Marketplace][marketplace-shield]][marketplace] [![License][license-shield]](LICENSE)
 
 <p>
 <img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/one-stop-light.png#gh-light-mode-only" width="400" alt="A bus stop, the next bus large with its countdown and delay, and three trams and buses after it">
@@ -276,6 +276,7 @@ MIT, see [LICENSE](LICENSE).
 [releases-shield]: https://img.shields.io/github/release/jesmak/departures-card.svg?style=for-the-badge
 [release-date-shield]: https://img.shields.io/github/release-date/jesmak/departures-card?style=for-the-badge
 [releases]: https://github.com/jesmak/departures-card/releases
+[downloads-shield]: https://img.shields.io/github/downloads/jesmak/departures-card/total.svg?style=for-the-badge
 [marketplace-shield]: https://img.shields.io/badge/Marketplace-Default-green.svg?style=for-the-badge
 [marketplace]: https://my.home-assistant.io/redirect/marketplace_repository/?owner=jesmak&repository=departures-card&category=plugin
 [license-shield]: https://img.shields.io/github/license/jesmak/departures-card.svg?style=for-the-badge
