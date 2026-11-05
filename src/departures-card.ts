@@ -634,6 +634,8 @@ export class DeparturesCard extends LitElement {
                 /* The card is the container its sections measure, so two stops sit side by side by the card's own width. A query
                    measures its content box, 34 px narrower than the card, so 586 px is a card of 620. */
                 ha-card {
+                    /* ha-card's own transition covers every property, so a change in the rows filled would animate. */
+                    transition: none;
                     container-type: inline-size;
                     padding: 16px;
                     font-variant-numeric: tabular-nums;
