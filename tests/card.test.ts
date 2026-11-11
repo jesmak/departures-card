@@ -1000,6 +1000,8 @@ describe("splitting a departure onto two lines", () => {
     // happy-dom lays nothing out, so each line is drawn from 0 to ONE_LINE, and its parts, while the card measures, end
     // where its width on one line says.
     const ONE_LINE = 300;
+    // What a stop whose rows scroll gives up of their width, to the scrollbar and the room beside it.
+    const SCROLLBAR = 20;
     const natural = new Map<Element, number>();
     let cardWidth = 340;
     let splitWhileMeasuring = false;
@@ -1024,10 +1026,10 @@ describe("splitting a departure onto two lines", () => {
             value(this: HTMLElement) {
                 let right = 0;
                 if (isLine(this)) {
-                    right = ONE_LINE;
+                    right = ONE_LINE - (this.closest(".rows.scrolls") ? SCROLLBAR : 0);
                 } else if (isLine(this.parentElement) && this.closest("ha-card")?.hasAttribute("data-measuring")) {
                     splitWhileMeasuring ||= this.parentElement!.classList.contains("split");
-                    right = natural.get(this.parentElement!) ?? ONE_LINE;
+                    right = natural.get(this.parentElement!) ?? ONE_LINE - SCROLLBAR;
                 }
                 return { left: 0, right, width: right, top: 0, bottom: 0, height: 0 } as DOMRect;
             },
@@ -1046,7 +1048,7 @@ describe("splitting a departure onto two lines", () => {
         document.body.innerHTML = "";
     });
 
-    async function stop(): Promise<DeparturesCard> {
+    async function stop(config: Partial<DeparturesCardConfig> = {}): Promise<DeparturesCard> {
         return card(
             hass({
                 "sensor.kauppatori": [
@@ -1055,8 +1057,16 @@ describe("splitting a departure onto two lines", () => {
                     departure("c", 20),
                 ],
             }),
-            {},
+            config,
         );
+    }
+
+    /** Gives a stop's rows a height of 100 and content as tall as `content` says each time it is read. */
+    function scroller(element: DeparturesCard, content: (rows: HTMLElement) => number): HTMLElement {
+        const rows = element.shadowRoot!.querySelector<HTMLElement>("section > .rows")!;
+        Object.defineProperty(rows, "clientHeight", { configurable: true, value: 100 });
+        Object.defineProperty(rows, "scrollHeight", { configurable: true, get: () => content(rows) });
+        return rows;
     }
 
     function lines(element: DeparturesCard): HTMLElement[] {
@@ -1082,6 +1092,56 @@ describe("splitting a departure onto two lines", () => {
         lines(element).forEach((line) => natural.set(line, ONE_LINE));
         expect(split(element)).toEqual(["one line", "one line", "one line"]);
         expect(splitWhileMeasuring).toBe(false);
+    });
+
+    // The second departure fits its row's whole width, but not what a scrollbar and the room beside it leave.
+    it.each<[string, Partial<DeparturesCardConfig>, number, boolean, string]>([
+        ["whose rows fit", { height: 300 }, 100, false, "one line"],
+        ["whose rows scroll", { height: 300 }, 140, true, "split"],
+        ["that isn't held to a height", {}, 140, false, "one line"],
+    ])("makes room for a scrollbar only in a stop that scrolls, as in one %s", async (_name, config, content, scrolls, expected) => {
+        const element = await stop(config);
+        const rows = scroller(element, () => content);
+        natural.set(lines(element)[1], ONE_LINE - SCROLLBAR / 2);
+        expect(split(element)).toEqual(["one line", expected, "one line"]);
+        expect(rows.classList.contains("scrolls")).toBe(scrolls);
+    });
+
+    it("measures a stop at its whole width each time, so rows split by a scrollbar don't keep it scrolling", async () => {
+        const element = await stop({ height: 300 });
+        // The rows fit on one line each, and scroll only once one of them is split.
+        let more = 60;
+        const rows = scroller(element, (part) => 100 + more + (part.querySelector(".split") ? 30 : 0));
+        natural.set(lines(element)[1], ONE_LINE - SCROLLBAR / 2);
+        expect(split(element)).toEqual(["one line", "split", "one line"]);
+        expect(rows.classList.contains("scrolls")).toBe(true);
+        more = 0;
+        expect(split(element)).toEqual(["one line", "one line", "one line"]);
+        expect(rows.classList.contains("scrolls")).toBe(false);
+    });
+
+    it("shows no scrollbar in a stop measured at its whole width, as rows still drawn split may scroll", () => {
+        const css = [(customElements.get("departures-card") as unknown as { styles: unknown }).styles]
+            .flat(3)
+            .map((style) => String((style as { cssText?: string }).cssText ?? ""))
+            .join("\n");
+        expect(css).toMatch(/ha-card\[data-measuring\] section > \.rows:not\(\.scrolls\) \{\s*overflow-y: hidden;/);
+    });
+
+    it("leaves a list scrolled where it was", async () => {
+        const element = await stop({ height: 300 });
+        // Measured at its whole width the list is shorter for a moment, which scrolls it back as a browser would.
+        let top = 0;
+        const rows = scroller(element, (part) => {
+            const content = part.classList.contains("scrolls") ? 200 : 140;
+            top = Math.min(top, content - 100);
+            return content;
+        });
+        Object.defineProperty(rows, "scrollTop", { configurable: true, get: () => top, set: (value: number) => (top = value) });
+        split(element);
+        top = 100;
+        split(element);
+        expect(top).toBe(100);
     });
 
     it("splits a departure again after the card is drawn afresh", async () => {

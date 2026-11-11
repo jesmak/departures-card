@@ -1419,13 +1419,42 @@ var DeparturesCard = class extends i4 {
    * Measuring never changes a height: each line is held to the height it is drawn at while it is measured, or the card
    * would change height for a moment, and whatever scrolls around it, the page or its own list, would scroll back up or
    * gain a scrollbar that makes the lines narrower than drawn.
+   *
+   * Held to a height, a stop whose later departures scroll gives up some of their width to the scrollbar and the room
+   * beside it, and one whose departures fit gives up none. Narrower rows split, and split rows are taller, so rows
+   * measured as they are drawn could keep scrolling only because they already did. Every stop is therefore measured
+   * at its whole width first, and only one that still scrolls is marked and measured again at the width left. A stop
+   * marked can make the next one scroll, as they share the card's height, so that repeats until no more do.
    */
   splitLines() {
     const card = this.renderRoot.querySelector("ha-card");
     if (!card?.clientWidth) {
       return;
     }
-    const lines = [...card.querySelectorAll(".next, .row")];
+    const scrollers = card.classList.contains("held") ? [...card.querySelectorAll("section > .rows")] : [];
+    const scrolled = scrollers.map((rows) => rows.scrollTop);
+    card.querySelectorAll(".rows.scrolls").forEach((rows) => rows.classList.remove("scrolls"));
+    this.measureLines(card, [...card.querySelectorAll(".next, .row")]);
+    for (; ; ) {
+      const scrolling = scrollers.filter((rows) => !rows.classList.contains("scrolls") && rows.scrollHeight > rows.clientHeight);
+      if (!scrolling.length) {
+        break;
+      }
+      scrolling.forEach((rows) => rows.classList.add("scrolls"));
+      this.measureLines(
+        card,
+        scrolling.flatMap((rows) => [...rows.querySelectorAll(".row")])
+      );
+    }
+    scrollers.forEach((rows, index) => {
+      if (rows.scrollTop !== scrolled[index]) {
+        rows.scrollTop = scrolled[index];
+      }
+    });
+    this.splits = new Set([...card.querySelectorAll(".split")].map((line) => line.dataset.key ?? ""));
+  }
+  /** Splits those of the lines that don't fit on one line at the width they have now. */
+  measureLines(card, lines) {
     const heights = lines.map((line) => getComputedStyle(line).height);
     lines.forEach((line, index) => {
       line.style.height = heights[index];
@@ -1438,7 +1467,6 @@ var DeparturesCard = class extends i4 {
       line.classList.toggle("split", over[index]);
       line.style.height = "";
     });
-    this.splits = new Set(lines.filter((_line, index) => over[index]).map((line) => line.dataset.key ?? ""));
   }
   /**
    * A stop's later departures get badges as wide as its widest, so their destinations line up, as line names such as
@@ -2401,11 +2429,17 @@ var DeparturesCard = class extends i4 {
                     scrollbar-width: thin;
                 }
 
-                /* Room between the rows and the scrollbar, and the scrollbar's gutter, whether there is anything to scroll or
-                   not, so the rows are as wide either way and a departure splits by the data, never by whether it scrolls. */
-                .held section > .rows {
+                /* Room between the rows and the scrollbar, and the scrollbar's gutter, only for a stop whose rows scroll, which
+                   splitLines marks. The gutter is kept, so the rows stay as wide as they were measured. */
+                .held section > .rows.scrolls {
                     padding-inline-end: 8px;
                     scrollbar-gutter: stable;
+                }
+
+                /* Measured at their whole width, rows still drawn split may scroll, and their scrollbar would take its
+                   width from them just the same. */
+                ha-card[data-measuring] section > .rows:not(.scrolls) {
+                    overflow-y: hidden;
                 }
             `,
       fadeStyles
