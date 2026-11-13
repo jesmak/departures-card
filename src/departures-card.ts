@@ -917,17 +917,34 @@ export class DeparturesCard extends LitElement {
                     min-width: 24px;
                 }
 
-                /* As tall as the line's text, so a badge with an icon is the same height as the ones with a number. A line box
-                   around the icon, its own on the baseline or ha-icon's around the inline svg, would add room for descenders. */
+                /* As tall as a line of the badge's text and centred in it, so a badge with an icon is the same height as the
+                   ones with a number, the large one's line being taller than the icon. A line box around the icon, its own on
+                   the baseline or ha-icon's around the inline svg, would add room for descenders. */
                 .badge .line.icon {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 1lh;
                     vertical-align: top;
                 }
 
                 .badge .line ha-icon {
                     display: flex;
-                    width: 18px;
-                    margin: 0 auto;
                     --mdc-icon-size: 18px;
+                }
+
+                /* A number centred by its capitals rather than by the font's line box, which leaves room for descenders under
+                   it. Trimmed to the capitals, the padding puts back exactly the room trimmed, so the badge keeps its height, and
+                   the top is rounded down to a whole pixel, so every badge's number rounds the same way. Without text-box the
+                   padding would only add to the line, so it waits for support. On the badge's baseline the trimmed number would
+                   sit lower in the badge's own line, which would grow by it, so it hangs from the top as the icon does. */
+                @supports (text-box: trim-both cap alphabetic) {
+                    .badge .line:not(.icon) {
+                        vertical-align: top;
+                        text-box: trim-both cap alphabetic;
+                        padding-top: round(down, (1lh - 1cap) / 2, 1px);
+                        padding-bottom: calc(1lh - 1cap - round(down, (1lh - 1cap) / 2, 1px));
+                    }
                 }
 
                 .badge.large {
