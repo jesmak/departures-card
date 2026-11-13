@@ -398,6 +398,28 @@ describe("departures-card", () => {
         expect(element.getGridOptions()).toEqual({ columns: 12, min_columns: 9, rows: "auto", min_rows: 4 });
     });
 
+    // Two stops one above the other need 472 px, 8 rows, and side by side 248 px, 4 rows. 23 columns can be 595.6 px of
+    // card and 24 columns 622, around the 620 where two stops go side by side.
+    it.each<[string, Partial<DeparturesCardConfig>, number]>([
+        ["a whole section", {}, 8],
+        ["23 columns", { grid_options: { columns: 23 } }, 8],
+        ["24 columns", { grid_options: { columns: 24 } }, 4],
+        ["24 columns in the older form", { layout_options: { grid_columns: 8 } }, 4],
+        ["the full width, whose columns aren't known", { grid_options: { columns: "full" } }, 8],
+        ["24 columns with one list for all", { grid_options: { columns: 24 }, combine: true }, 4],
+    ])("counts two stops side by side only when its columns keep them so at their narrowest: %s", async (_, config, rows) => {
+        const state = hass({ "sensor.east": [departure("a", 5)], "sensor.west": [departure("b", 5)] });
+        const element = await card(state, { entities: ["sensor.east", "sensor.west"], ...config });
+        expect(element.getGridOptions().min_rows).toBe(rows);
+    });
+
+    it("puts a third stop under a pair side by side", async () => {
+        const state = hass({ "sensor.a": [departure("a", 5)], "sensor.b": [departure("b", 5)], "sensor.c": [departure("c", 5)] });
+        const element = await card(state, { entities: ["sensor.a", "sensor.b", "sensor.c"], grid_options: { columns: 24 } });
+        // 34 + 27 + 2 × 187 = 435 px.
+        expect(element.getGridOptions().min_rows).toBe(7);
+    });
+
     // Every text the card can cut short carries its own text as a tooltip, in every state, so it shows in full when the
     // mouse is over it whenever it is cut: the title, the attribution, the stop's name, subtitle and notices, the next
     // departure's destination and notice, and the later departures' destinations and what they say in words. The

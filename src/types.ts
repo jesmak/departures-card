@@ -25,6 +25,10 @@ export interface DeparturesCardConfig extends LovelaceCardConfig, RowStepConfig 
     full_texts?: boolean;
     /** All the sensors as one list by time instead of a section each, such as an airport's departures and arrivals. */
     combine?: boolean;
+    /** The size set in a sections view's layout tab. Its columns decide whether the least height counts stops side by side. */
+    grid_options?: { rows?: unknown; columns?: unknown };
+    /** The older form of `grid_options`, in thirds of its columns. */
+    layout_options?: { grid_rows?: unknown; grid_columns?: unknown };
 }
 
 /** Which way a sensor's list goes. A sensor that doesn't say is departures. */

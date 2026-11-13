@@ -36,6 +36,18 @@ import type { Departure, DeparturesCardConfig, SectionConfig, ShownDeparture } f
 /** The gap under the title, to which the room a whole row leaves over is added. */
 const TITLE_GAP_PX = 4;
 
+/** The card's width from which two stops sit side by side, the container query's 586 px of content and 34 of padding and border. */
+const SIDE_BY_SIDE_PX = 620;
+
+/**
+ * The narrowest a card of these columns gets in a sections view. A section beside others is at least 320 px, which
+ * gives 12 columns 307 px with 8 px between them. A card wider than a section spans sections each that wide, with
+ * gaps wider than a column's, so this is the least it gets there too.
+ */
+function narrowestWidth(columns: number): number {
+    return (columns * (307 + 8)) / 12 - 8;
+}
+
 /**
  * Whether a line laid out on one line runs past its right side. Read from the parts' own boxes, in fractions of a
  * pixel, as scrollWidth and clientWidth are rounded to whole pixels and miss a line less than half a pixel too wide.
@@ -146,17 +158,19 @@ export class DeparturesCard extends LitElement {
      * where a line's badge and a departure's time still fit side by side.
      */
     public getGridOptions(): Record<string, unknown> {
-        return { columns: 12, min_columns: 9, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
+        return { columns: 12, min_columns: 9, rows: "auto", min_rows: gridMinRows(this.minimumHeight(true)) };
     }
 
     /**
      * Held to a height, the title, the attribution and every stop's heading, which a held card keeps to one line each,
-     * and every stop's next departure and first row after it still fit, with room for each to be split, with the stops
-     * one above the other. The minimum is for the narrowest its columns get, where a departure may not fit on one line,
-     * and a split one is never taller. Notices, texts shown in full, the line about a sensor that can't be shown and a
-     * long line name wrapping on a card narrower than a section allows come with the data, so they aren't counted.
+     * and every stop's next departure and first row after it still fit, with room for each to be split. The minimum is
+     * for the narrowest its columns get, where a departure may not fit on one line, and a split one is never taller.
+     * In a sections view, columns that keep the card wide enough for two stops side by side even at their narrowest
+     * count the stops in pairs, otherwise they are one above the other. Notices, texts shown in full, the line about a
+     * sensor that can't be shown and a long line name wrapping on a card narrower than a section allows come with the
+     * data, so they aren't counted.
      */
-    private minimumHeight(): number {
+    private minimumHeight(grid = this.layout === "grid"): number {
         if (!this.config) {
             return 0;
         }
@@ -167,9 +181,24 @@ export class DeparturesCard extends LitElement {
         const next = 106;
         // The first row after it, on its two lines.
         const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 81 : 0;
-        const divider = 37;
         const stops = this.combines ? 1 : sectionsOf(this.config.entities).length;
+        if (grid && narrowestWidth(this.columns()) >= SIDE_BY_SIDE_PX) {
+            // Side by side, a pair of stops is as tall as one, and a third goes under them with nothing between.
+            return borderAndPadding + title + attribution + Math.ceil(stops / 2) * (next + row);
+        }
+        const divider = 37;
         return borderAndPadding + title + attribution + stops * (next + row) + (stops - 1) * divider;
+    }
+
+    /** The columns set in the layout tab, in either form Home Assistant has saved them, or a whole section. */
+    private columns(): number {
+        const config = this.config;
+        const columns = config?.grid_options
+            ? config.grid_options.columns
+            : typeof config?.layout_options?.grid_columns === "number"
+              ? config.layout_options.grid_columns * 3
+              : undefined;
+        return typeof columns === "number" ? columns : 12;
     }
 
     /** The countdowns run on between the sensor's updates, so the card redraws itself while it is on the page. */

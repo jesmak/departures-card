@@ -1302,6 +1302,10 @@ var ScrollFade = class {
 
 // src/departures-card.ts
 var TITLE_GAP_PX = 4;
+var SIDE_BY_SIDE_PX = 620;
+function narrowestWidth(columns) {
+  return columns * (307 + 8) / 12 - 8;
+}
 function overflows(line) {
   const { right } = line.getBoundingClientRect();
   return [...line.children].some((part) => part.getBoundingClientRect().right > right + 0.01);
@@ -1376,16 +1380,18 @@ var DeparturesCard = class extends i4 {
    * where a line's badge and a departure's time still fit side by side.
    */
   getGridOptions() {
-    return { columns: 12, min_columns: 9, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
+    return { columns: 12, min_columns: 9, rows: "auto", min_rows: gridMinRows(this.minimumHeight(true)) };
   }
   /**
    * Held to a height, the title, the attribution and every stop's heading, which a held card keeps to one line each,
-   * and every stop's next departure and first row after it still fit, with room for each to be split, with the stops
-   * one above the other. The minimum is for the narrowest its columns get, where a departure may not fit on one line,
-   * and a split one is never taller. Notices, texts shown in full, the line about a sensor that can't be shown and a
-   * long line name wrapping on a card narrower than a section allows come with the data, so they aren't counted.
+   * and every stop's next departure and first row after it still fit, with room for each to be split. The minimum is
+   * for the narrowest its columns get, where a departure may not fit on one line, and a split one is never taller.
+   * In a sections view, columns that keep the card wide enough for two stops side by side even at their narrowest
+   * count the stops in pairs, otherwise they are one above the other. Notices, texts shown in full, the line about a
+   * sensor that can't be shown and a long line name wrapping on a card narrower than a section allows come with the
+   * data, so they aren't counted.
    */
-  minimumHeight() {
+  minimumHeight(grid = this.layout === "grid") {
     if (!this.config) {
       return 0;
     }
@@ -1394,9 +1400,18 @@ var DeparturesCard = class extends i4 {
     const attribution = 27;
     const next = 106;
     const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 81 : 0;
-    const divider = 37;
     const stops = this.combines ? 1 : sectionsOf(this.config.entities).length;
+    if (grid && narrowestWidth(this.columns()) >= SIDE_BY_SIDE_PX) {
+      return borderAndPadding + title + attribution + Math.ceil(stops / 2) * (next + row);
+    }
+    const divider = 37;
     return borderAndPadding + title + attribution + stops * (next + row) + (stops - 1) * divider;
+  }
+  /** The columns set in the layout tab, in either form Home Assistant has saved them, or a whole section. */
+  columns() {
+    const config = this.config;
+    const columns = config?.grid_options ? config.grid_options.columns : typeof config?.layout_options?.grid_columns === "number" ? config.layout_options.grid_columns * 3 : void 0;
+    return typeof columns === "number" ? columns : 12;
   }
   /** The countdowns run on between the sensor's updates, so the card redraws itself while it is on the page. */
   connectedCallback() {

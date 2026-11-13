@@ -138,7 +138,10 @@ them in full.
 
 Held to a height, the card keeps its title, its attribution and each stop's name and subtitle to one line, cut short
 with an ellipsis when they are longer, unless `full_texts` shows them in full. The least it gets keeps every stop's
-next departure and the first departure after it in view, with room for each to be split. A stop's notices, texts shown in full,
+next departure and the first departure after it in view, with room for each to be split. It counts the stops one above
+the other, unless the card has 24 columns or more in a sections view, which keep it at least 620 px wide wherever its
+section sits beside others, so its stops always sit in pairs side by side there. On a phone, where the section takes the
+screen's width, such a card's stops go one above the other again, and those that don't fit the rows set for it scroll. A stop's notices, texts shown in full,
 the line about a sensor that can't be shown and a long line name wrapping on a card inside another card, narrower than
 a section allows, take room of their own, and the later departures scroll under them.
 
