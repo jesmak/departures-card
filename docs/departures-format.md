@@ -65,21 +65,21 @@ that changes on its own, such as "in 4 min".
 
 ## Departures
 
-| Field       | Type     | Required | Meaning                                                                                                                                                                                                   |
-| ----------- | -------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`        | string   | **MUST** | Unique within the entity and stable between updates. Prefix it with the kind of identifier, such as `trip:HSL:1055_20261004_Ma_2_1645/2026-10-04` or `train:2026-10-04/45`.                               |
-| `line`      | string   | **MUST** | What the line or train is called, short enough for a badge, such as `55`, `IC 45` or `M2`.                                                                                                                |
-| `mode`      | string   | **MUST** | `bus`, `tram`, `metro`, `train`, `ferry`, `plane` or `other`. Picks the default colour. An unknown mode is shown as `other`.                                                                              |
-| `headsign`  | string   | SHOULD   | Where it's heading, as shown on the vehicle, such as `Koskela` or `Helsinki`.                                                                                                                             |
-| `scheduled` | ISO 8601 | **MUST** | The timetabled departure time.                                                                                                                                                                            |
-| `estimated` | ISO 8601 | **MUST** | The live estimate when there is one, otherwise the same as `scheduled`. The card counts down to this.                                                                                                     |
-| `realtime`  | boolean  | SHOULD   | Whether `estimated` comes from live data. Missing means `false`. The card marks live times.                                                                                                               |
-| `delay`     | integer  | MAY      | Seconds behind the timetable, negative when early. Missing means 0. The card shows the delay in the minutes its clock times show, worked out from `scheduled` and `estimated`, so the two never disagree. |
-| `platform`  | string   | MAY      | Track, platform or gate, such as `3`, `B` or `28`.                                                                                                                                                        |
-| `cancelled` | boolean  | MAY      | The departure is cancelled. Missing means `false`.                                                                                                                                                        |
-| `arrived`   | boolean  | MAY      | An arrival has come in. Its `estimated` is then when it did, as near as the source knows. Missing means `false`. Only for an arrivals sensor.                                                             |
-| `notice`    | string   | MAY      | A short notice in the language the source was configured for, such as the reason for a cancellation, `Rolling stock`.                                                                                     |
-| `color`     | string   | MAY      | The line's own colour as a CSS hex colour, `#00985f`. Replaces the mode's default colour. The card picks a readable text colour for it.                                                                   |
+| Field       | Type     | Required | Meaning                                                                                                                                                                                                                        |
+| ----------- | -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`        | string   | **MUST** | Unique within the entity and stable between updates. Prefix it with the kind of identifier, such as `trip:HSL:1055_20261004_Ma_2_1645/2026-10-04` or `train:2026-10-04/45`.                                                    |
+| `line`      | string   | **MUST** | What the line or train is called, short enough for a badge, such as `55`, `IC 45` or `M2`. An empty string when the line has no such name, such as a rural route known only by its stops. The card then shows the mode's icon. |
+| `mode`      | string   | **MUST** | `bus`, `tram`, `metro`, `train`, `ferry`, `plane` or `other`. Picks the default colour. An unknown mode is shown as `other`.                                                                                                   |
+| `headsign`  | string   | SHOULD   | Where it's heading, as shown on the vehicle, such as `Koskela` or `Helsinki`.                                                                                                                                                  |
+| `scheduled` | ISO 8601 | **MUST** | The timetabled departure time.                                                                                                                                                                                                 |
+| `estimated` | ISO 8601 | **MUST** | The live estimate when there is one, otherwise the same as `scheduled`. The card counts down to this.                                                                                                                          |
+| `realtime`  | boolean  | SHOULD   | Whether `estimated` comes from live data. Missing means `false`. The card marks live times.                                                                                                                                    |
+| `delay`     | integer  | MAY      | Seconds behind the timetable, negative when early. Missing means 0. The card shows the delay in the minutes its clock times show, worked out from `scheduled` and `estimated`, so the two never disagree.                      |
+| `platform`  | string   | MAY      | Track, platform or gate, such as `3`, `B` or `28`.                                                                                                                                                                             |
+| `cancelled` | boolean  | MAY      | The departure is cancelled. Missing means `false`.                                                                                                                                                                             |
+| `arrived`   | boolean  | MAY      | An arrival has come in. Its `estimated` is then when it did, as near as the source knows. Missing means `false`. Only for an arrivals sensor.                                                                                  |
+| `notice`    | string   | MAY      | A short notice in the language the source was configured for, such as the reason for a cancellation, `Rolling stock`.                                                                                                          |
+| `color`     | string   | MAY      | The line's own colour as a CSS hex colour, `#00985f`. Replaces the mode's default colour. The card picks a readable text colour for it.                                                                                        |
 
 Fields the card doesn't know are ignored.
 
@@ -225,4 +225,5 @@ The state is IC 45's estimated time, because S 172 is cancelled.
 
 `departures_version` changes only for breaking changes. New optional fields are added to version 1 without
 changing it, and the card ignores fields it doesn't know. `direction` and `arrived` were added that way, so a card
-before 1.2.0 shows an arrivals sensor as departures.
+before 1.2.0 shows an arrivals sensor as departures. An empty `line` is allowed the same way, and a card before 1.5.0
+shows it as an empty badge.

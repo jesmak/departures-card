@@ -323,6 +323,21 @@ describe("departures-card", () => {
         expect(text(tuesday.shadowRoot!.querySelector(".row .time"))).toBe("ti 06.52");
     });
 
+    it("shows the mode's icon for a line with no name, cancelled or not", async () => {
+        const element = await card(
+            hass({
+                "sensor.kauppatori": [
+                    departure("a", 5, { line: "" }),
+                    departure("b", 9, { line: " ", mode: "ferry" }),
+                    departure("c", 12, { line: "", mode: "hovercraft", cancelled: true }),
+                ],
+            }),
+            {},
+        );
+        const icons = [...element.shadowRoot!.querySelectorAll(".badge .line ha-icon")].map((icon) => icon.getAttribute("icon"));
+        expect(icons).toEqual(["mdi:bus", "mdi:ferry", "mdi:transit-connection-variant"]);
+    });
+
     it("strikes a cancelled departure through with its reason, or hides it", async () => {
         const list = [departure("a", 5), departure("x", 9, { mode: "train", line: "S 172", cancelled: true, notice: "Kalusto" })];
         const shown = await card(hass({ "sensor.kauppatori": list }), {});

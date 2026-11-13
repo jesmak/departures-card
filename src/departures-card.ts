@@ -10,7 +10,7 @@ import type { CSSResultGroup, PropertyValues, TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 
-import { CARD_VERSION, DEFAULT_DEPARTURES, TICK_MS } from "./const";
+import { CARD_VERSION, DEFAULT_DEPARTURES, MODE_ICONS, TICK_MS } from "./const";
 import {
     badgeColors,
     clock,
@@ -598,12 +598,21 @@ export class DeparturesCard extends LitElement {
     /** A cancelled departure's badge is an outline in the theme's own text colour, which every theme makes readable. */
     private badge(departure: Departure, size: "large" | "small"): TemplateResult {
         if (departure.cancelled) {
-            return html`<span class="badge ${size} cancelled"><span class="line">${departure.line}</span></span>`;
+            return html`<span class="badge ${size} cancelled">${this.lineName(departure)}</span>`;
         }
         const colors = badgeColors(departure);
         return html`<span class="badge ${size}" style="background:${colors.background};color:${colors.text}"
-            ><span class="line">${departure.line}</span></span
+            >${this.lineName(departure)}</span
         >`;
+    }
+
+    /** A line with no name of its own, such as a rural route known only by its stops, shows its mode's icon. */
+    private lineName(departure: Departure): TemplateResult {
+        const line = departure.line.trim();
+        if (line) {
+            return html`<span class="line">${line}</span>`;
+        }
+        return html`<span class="line icon"><ha-icon icon=${MODE_ICONS[departure.mode] ?? MODE_ICONS.other}></ha-icon></span>`;
     }
 
     private live(departure: Departure): TemplateResult | typeof nothing {
@@ -877,6 +886,19 @@ export class DeparturesCard extends LitElement {
                 .badge .line {
                     display: inline-block;
                     min-width: 24px;
+                }
+
+                /* As tall as the line's text, so a badge with an icon is the same height as the ones with a number. A line box
+                   around the icon, its own on the baseline or ha-icon's around the inline svg, would add room for descenders. */
+                .badge .line.icon {
+                    vertical-align: top;
+                }
+
+                .badge .line ha-icon {
+                    display: flex;
+                    width: 18px;
+                    margin: 0 auto;
+                    --mdc-icon-size: 18px;
                 }
 
                 .badge.large {

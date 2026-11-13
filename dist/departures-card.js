@@ -1,4 +1,4 @@
-/*! departures-card 1.4.1 | MIT License */
+/*! departures-card 1.5.0 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,13 +711,22 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.4.1";
+var CARD_VERSION = "1.5.0";
 var DEPARTURES_VERSION = 1;
 var DEFAULT_DEPARTURES = 4;
 var GONE_AFTER_MS = 6e4;
 var ARRIVED_KEPT_MS = 30 * 6e4;
 var ARRIVED_ROWS = 2;
 var TICK_MS = 15e3;
+var MODE_ICONS = {
+  bus: "mdi:bus",
+  tram: "mdi:tram",
+  metro: "mdi:subway-variant",
+  train: "mdi:train",
+  ferry: "mdi:ferry",
+  plane: "mdi:airplane",
+  other: "mdi:transit-connection-variant"
+};
 var MODE_COLORS = {
   bus: "var(--departures-bus-color, #0b6aa2)",
   tram: "var(--departures-tram-color, #00845a)",
@@ -1743,12 +1752,20 @@ var DeparturesCard = class extends i4 {
   /** A cancelled departure's badge is an outline in the theme's own text colour, which every theme makes readable. */
   badge(departure, size) {
     if (departure.cancelled) {
-      return b2`<span class="badge ${size} cancelled"><span class="line">${departure.line}</span></span>`;
+      return b2`<span class="badge ${size} cancelled">${this.lineName(departure)}</span>`;
     }
     const colors = badgeColors(departure);
     return b2`<span class="badge ${size}" style="background:${colors.background};color:${colors.text}"
-            ><span class="line">${departure.line}</span></span
+            >${this.lineName(departure)}</span
         >`;
+  }
+  /** A line with no name of its own, such as a rural route known only by its stops, shows its mode's icon. */
+  lineName(departure) {
+    const line = departure.line.trim();
+    if (line) {
+      return b2`<span class="line">${line}</span>`;
+    }
+    return b2`<span class="line icon"><ha-icon icon=${MODE_ICONS[departure.mode] ?? MODE_ICONS.other}></ha-icon></span>`;
   }
   live(departure) {
     return departure.realtime ? b2`<ha-icon class="live" icon="mdi:access-point" title="${this.text("common.realtime")}"></ha-icon>` : A;
@@ -2010,6 +2027,19 @@ var DeparturesCard = class extends i4 {
                 .badge .line {
                     display: inline-block;
                     min-width: 24px;
+                }
+
+                /* As tall as the line's text, so a badge with an icon is the same height as the ones with a number. A line box
+                   around the icon, its own on the baseline or ha-icon's around the inline svg, would add room for descenders. */
+                .badge .line.icon {
+                    vertical-align: top;
+                }
+
+                .badge .line ha-icon {
+                    display: flex;
+                    width: 18px;
+                    margin: 0 auto;
+                    --mdc-icon-size: 18px;
                 }
 
                 .badge.large {

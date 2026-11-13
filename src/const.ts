@@ -20,6 +20,17 @@ export const ARRIVED_ROWS = 2;
 /** How often the countdowns are redrawn, between the sensor's own updates. */
 export const TICK_MS = 15_000;
 
+/** The badge's icon per mode, for a line that has no name to show. */
+export const MODE_ICONS: Record<string, string> = {
+    bus: "mdi:bus",
+    tram: "mdi:tram",
+    metro: "mdi:subway-variant",
+    train: "mdi:train",
+    ferry: "mdi:ferry",
+    plane: "mdi:airplane",
+    other: "mdi:transit-connection-variant",
+};
+
 /** A default colour per mode. A line's own colour replaces the mode's. */
 export const MODE_COLORS: Record<string, string> = {
     bus: "var(--departures-bus-color, #0b6aa2)",

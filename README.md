@@ -89,6 +89,8 @@ masonry or panel view, or a stack or other card the card is inside, even in a se
   timetable time is struck through next to the estimate, with the difference in minutes. A later departure shows its
   estimate with the difference.
 - **The line's colour**, when the integration gives one, otherwise a colour by vehicle type.
+- **The vehicle type's icon** in the badge of a line that has no number or name of its own, such as a rural bus
+  route known only by its stops.
 - **Track, platform or gate:** a train's track, a plane's gate, or another vehicle's platform, when the stop has them.
   An arriving plane's is its baggage hall.
 - **Cancellations:** a cancelled departure stays in the list, greyed and struck through, with the reason when the
