@@ -6,6 +6,7 @@
         "invalid_departures": "Virheellinen konfiguraatio. Lähtöjen määrän pitää olla kokonaisluku, vähintään 1.",
         "invalid_height": "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikseleinä, ja korkeustilan (height_mode) auto, fixed tai max.",
         "invalid_row_step": "Virheellinen pyöristys. Pyöristyksen (row_step) on oltava full tai half.",
+        "no_entities": "Ei vielä pysäkkejä. Lisää pysäkkianturi kortin asetuksista.",
         "no_entity": "Entiteettiä {entity} ei löydy",
         "not_departures": "{entity} ei ole pysäkkianturi",
         "unavailable": "Lähtötiedot eivät ole juuri nyt saatavilla",

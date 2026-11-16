@@ -1,4 +1,4 @@
-/*! departures-card 1.5.0 | MIT License */
+/*! departures-card 1.5.1 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,7 +711,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.5.0";
+var CARD_VERSION = "1.5.1";
 var DEPARTURES_VERSION = 1;
 var DEFAULT_DEPARTURES = 4;
 var GONE_AFTER_MS = 6e4;
@@ -929,6 +929,7 @@ var en_default = {
     invalid_departures: "Invalid configuration. The number of departures must be a whole number, at least 1.",
     invalid_height: "Invalid height. height and max_height must be positive numbers of pixels, and height_mode auto, fixed or max.",
     invalid_row_step: "Invalid rounding. row_step must be full or half.",
+    no_entities: "No stops yet. Add a departures sensor in the card's settings.",
     no_entity: "Entity {entity} not found",
     not_departures: "{entity} is not a departures sensor",
     unavailable: "Departures are not available right now",
@@ -984,6 +985,7 @@ var fi_default = {
     invalid_departures: "Virheellinen konfiguraatio. L\xE4ht\xF6jen m\xE4\xE4r\xE4n pit\xE4\xE4 olla kokonaisluku, v\xE4hint\xE4\xE4n 1.",
     invalid_height: "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikselein\xE4, ja korkeustilan (height_mode) auto, fixed tai max.",
     invalid_row_step: "Virheellinen py\xF6ristys. Py\xF6ristyksen (row_step) on oltava full tai half.",
+    no_entities: "Ei viel\xE4 pys\xE4kkej\xE4. Lis\xE4\xE4 pys\xE4kkianturi kortin asetuksista.",
     no_entity: "Entiteetti\xE4 {entity} ei l\xF6ydy",
     not_departures: "{entity} ei ole pys\xE4kkianturi",
     unavailable: "L\xE4ht\xF6tiedot eiv\xE4t ole juuri nyt saatavilla",
@@ -1351,7 +1353,7 @@ var DeparturesCard = class extends i4 {
   }
   setConfig(config) {
     const entities = typeof config?.entities === "string" ? [config.entities] : config?.entities;
-    if (!config || !Array.isArray(entities) || sectionsOf(entities).length === 0) {
+    if (!config || !Array.isArray(entities) || entities.length > 0 && sectionsOf(entities).length === 0) {
       throw new Error(translate(browserLanguage(), "common.invalid_configuration"));
     }
     if (config.departures != null && !(Number.isInteger(config.departures) && config.departures >= 1)) {
@@ -1401,6 +1403,9 @@ var DeparturesCard = class extends i4 {
     const next = 106;
     const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 81 : 0;
     const stops = this.combines ? 1 : sectionsOf(this.config.entities).length;
+    if (stops === 0) {
+      return 0;
+    }
     if (grid && narrowestWidth(this.columns()) >= SIDE_BY_SIDE_PX) {
       return borderAndPadding + title + attribution + Math.ceil(stops / 2) * (next + row);
     }
@@ -1583,6 +1588,7 @@ var DeparturesCard = class extends i4 {
     return b2`
             <ha-card class=${classes} style=${style}>
                 ${this.config.title ? b2`<h1 class="card-title" title=${this.config.title}>${this.config.title}</h1>` : A}
+                ${sections.length === 0 ? b2`<div class="message">${this.text("common.no_entities")}</div>` : A}
                 <div class="sections">${this.combines ? this.combined(sections) : sections.map((section) => this.section(section))}</div>
                 ${attribution ? b2`<div class="attribution" title=${attribution}>${attribution}</div>` : A}
             </ha-card>

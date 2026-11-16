@@ -125,7 +125,8 @@ export class DeparturesCard extends LitElement {
     public setConfig(config: DeparturesCardConfig): void {
         // One sensor may be written without a list around it.
         const entities: unknown = typeof config?.entities === "string" ? [config.entities] : config?.entities;
-        if (!config || !Array.isArray(entities) || sectionsOf(entities).length === 0) {
+        // An empty list is the picker's stub when there is no departures sensor yet, and the card says so.
+        if (!config || !Array.isArray(entities) || (entities.length > 0 && sectionsOf(entities).length === 0)) {
             throw new Error(translate(browserLanguage(), "common.invalid_configuration"));
         }
         // An empty `departures:` in YAML is null, the default as a missing one is.
@@ -182,6 +183,9 @@ export class DeparturesCard extends LitElement {
         // The first row after it, on its two lines.
         const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 81 : 0;
         const stops = this.combines ? 1 : sectionsOf(this.config.entities).length;
+        if (stops === 0) {
+            return 0;
+        }
         if (grid && narrowestWidth(this.columns()) >= SIDE_BY_SIDE_PX) {
             // Side by side, a pair of stops is as tall as one, and a third goes under them with nothing between.
             return borderAndPadding + title + attribution + Math.ceil(stops / 2) * (next + row);
@@ -406,6 +410,7 @@ export class DeparturesCard extends LitElement {
         return html`
             <ha-card class=${classes} style=${style}>
                 ${this.config.title ? html`<h1 class="card-title" title=${this.config.title}>${this.config.title}</h1>` : nothing}
+                ${sections.length === 0 ? html`<div class="message">${this.text("common.no_entities")}</div>` : nothing}
                 <div class="sections">${this.combines ? this.combined(sections) : sections.map((section) => this.section(section))}</div>
                 ${attribution ? html`<div class="attribution" title=${attribution}>${attribution}</div>` : nothing}
             </ha-card>

@@ -370,9 +370,16 @@ describe("departures-card", () => {
         expect(hidden.shadowRoot!.querySelector(".stop-notice")).toBeNull();
     });
 
-    it("refuses a configuration with no stops", () => {
+    it("shows its picker stub with no departures sensor as a hint", async () => {
+        const stub = (customElements.get("departures-card") as unknown as typeof DeparturesCard).getStubConfig(hass({}));
+        expect(stub).toEqual({ entities: [] });
+        const element = await card(hass({}), stub as Partial<DeparturesCardConfig>);
+        expect(text(element.shadowRoot!.querySelector(".message"))).toBe(translate("fi", "common.no_entities"));
+    });
+
+    it("refuses a configuration with no usable stops", () => {
         const element = document.createElement("departures-card");
-        expect(() => element.setConfig({ type: "custom:departures-card", entities: [] })).toThrow();
+        expect(() => element.setConfig({ type: "custom:departures-card", entities: [""] })).toThrow();
         // Not a list nor a sensor: the card's own message, not a TypeError.
         const broken = { type: "custom:departures-card", entities: { entity: "sensor.kauppatori" } } as unknown as DeparturesCardConfig;
         expect(() => element.setConfig(broken)).toThrow(/departures sensor|pysäkkianturi/);
