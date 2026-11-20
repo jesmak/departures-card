@@ -664,13 +664,18 @@ export class DeparturesCard extends LitElement {
         >`;
     }
 
-    /** A train leaves from a track, a plane from a gate and lands into a hall, everything else from a platform. */
+    /** A train leaves from a track, a plane from a gate and lands into a hall, a ship from a berth, everything else from a platform. */
     private platform(departure: ShownDeparture): TemplateResult | typeof nothing {
         if (!departure.platform) {
             return nothing;
         }
-        const plane = departure.direction === "arrivals" ? "common.hall" : "common.gate";
-        const label = this.text(departure.mode === "train" ? "common.track" : departure.mode === "plane" ? plane : "common.platform");
+        const labels: Record<string, string> = {
+            train: "common.track",
+            plane: departure.direction === "arrivals" ? "common.hall" : "common.gate",
+            ferry: "common.berth",
+            ship: "common.berth",
+        };
+        const label = this.text(labels[departure.mode] ?? "common.platform");
         return html`<span class="platform">${label} ${departure.platform}</span>`;
     }
 

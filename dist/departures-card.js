@@ -1,4 +1,4 @@
-/*! departures-card 1.5.1 | MIT License */
+/*! departures-card 1.6.0 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,7 +711,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.5.1";
+var CARD_VERSION = "1.6.0";
 var DEPARTURES_VERSION = 1;
 var DEFAULT_DEPARTURES = 4;
 var GONE_AFTER_MS = 6e4;
@@ -724,6 +724,7 @@ var MODE_ICONS = {
   metro: "mdi:subway-variant",
   train: "mdi:train",
   ferry: "mdi:ferry",
+  ship: "mdi:ship-wheel",
   plane: "mdi:airplane",
   other: "mdi:transit-connection-variant"
 };
@@ -733,6 +734,7 @@ var MODE_COLORS = {
   metro: "var(--departures-metro-color, #d9480f)",
   train: "var(--departures-train-color, #1b7a3e)",
   ferry: "var(--departures-ferry-color, #00639a)",
+  ship: "var(--departures-ship-color, #0b7285)",
   plane: "var(--departures-plane-color, #6741d9)",
   other: "var(--departures-other-color, #5f6b76)"
 };
@@ -940,6 +942,7 @@ var en_default = {
     track: "Track",
     platform: "Platform",
     gate: "Gate",
+    berth: "Berth",
     realtime: "Real-time estimate",
     departures: "Departures",
     arrivals: "Arrivals",
@@ -996,6 +999,7 @@ var fi_default = {
     track: "Raide",
     platform: "Laituri",
     gate: "Portti",
+    berth: "Laituri",
     realtime: "Reaaliaikainen arvio",
     departures: "L\xE4htev\xE4t",
     arrivals: "Saapuvat",
@@ -1799,13 +1803,18 @@ var DeparturesCard = class extends i4 {
             >${minutes > 0 ? "+" : "\u2212"}${Math.abs(minutes)} ${this.text("common.min")}</span
         >`;
   }
-  /** A train leaves from a track, a plane from a gate and lands into a hall, everything else from a platform. */
+  /** A train leaves from a track, a plane from a gate and lands into a hall, a ship from a berth, everything else from a platform. */
   platform(departure) {
     if (!departure.platform) {
       return A;
     }
-    const plane = departure.direction === "arrivals" ? "common.hall" : "common.gate";
-    const label = this.text(departure.mode === "train" ? "common.track" : departure.mode === "plane" ? plane : "common.platform");
+    const labels = {
+      train: "common.track",
+      plane: departure.direction === "arrivals" ? "common.hall" : "common.gate",
+      ferry: "common.berth",
+      ship: "common.berth"
+    };
+    const label = this.text(labels[departure.mode] ?? "common.platform");
     return b2`<span class="platform">${label} ${departure.platform}</span>`;
   }
   /** A clock time, with its day in front when it isn't today: "ma 06.15". */

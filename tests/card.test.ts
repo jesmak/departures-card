@@ -301,6 +301,9 @@ describe("departures-card", () => {
         ["train", "en", "Track 3"],
         ["plane", "en", "Gate 3"],
         ["bus", "en", "Platform 3"],
+        ["ship", "en", "Berth 3"],
+        ["ferry", "en", "Berth 3"],
+        ["ship", "fi", "Laituri 3"],
     ])("names a %s's platform in %s, on the next departure and the rows alike", async (mode, language, label) => {
         const state = hass({
             "sensor.kauppatori": [departure("a", 11, { mode, platform: "3" }), departure("b", 26, { mode, platform: "3" })],
@@ -330,12 +333,13 @@ describe("departures-card", () => {
                     departure("a", 5, { line: "" }),
                     departure("b", 9, { line: " ", mode: "ferry" }),
                     departure("c", 12, { line: "", mode: "hovercraft", cancelled: true }),
+                    departure("d", 14, { line: "", mode: "ship" }),
                 ],
             }),
             {},
         );
         const icons = [...element.shadowRoot!.querySelectorAll(".badge .line ha-icon")].map((icon) => icon.getAttribute("icon"));
-        expect(icons).toEqual(["mdi:bus", "mdi:ferry", "mdi:transit-connection-variant"]);
+        expect(icons).toEqual(["mdi:bus", "mdi:ferry", "mdi:transit-connection-variant", "mdi:ship-wheel"]);
     });
 
     it("strikes a cancelled departure through with its reason, or hides it", async () => {

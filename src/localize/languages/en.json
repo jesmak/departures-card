@@ -17,6 +17,7 @@
         "track": "Track",
         "platform": "Platform",
         "gate": "Gate",
+        "berth": "Berth",
         "realtime": "Real-time estimate",
         "departures": "Departures",
         "arrivals": "Arrivals",

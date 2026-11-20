@@ -91,8 +91,8 @@ masonry or panel view, or a stack or other card the card is inside, even in a se
 - **The line's colour**, when the integration gives one, otherwise a colour by vehicle type.
 - **The vehicle type's icon** in the badge of a line that has no number or name of its own, such as a rural bus
   route known only by its stops.
-- **Track, platform or gate:** a train's track, a plane's gate, or another vehicle's platform, when the stop has them.
-  An arriving plane's is its baggage hall.
+- **Track, platform, gate or berth:** a train's track, a plane's gate, a ship's or ferry's berth, or another vehicle's
+  platform, when the stop has them. An arriving plane's is its baggage hall.
 - **Cancellations:** a cancelled departure stays in the list, greyed and struck through, with the reason when the
   integration gives one. It is counted in the number of departures, so the list is as long whatever is cancelled. It is
   never the large one, which is always the next departure you can actually take, even when a run of cancellations
@@ -172,6 +172,7 @@ The vehicle types' colours can be changed in a theme:
 | `--departures-metro-color` | `#d9480f` |
 | `--departures-train-color` | `#1b7a3e` |
 | `--departures-ferry-color` | `#00639a` |
+| `--departures-ship-color`  | `#0b7285` |
 | `--departures-plane-color` | `#6741d9` |
 | `--departures-other-color` | `#5f6b76` |
 

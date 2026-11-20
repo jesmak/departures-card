@@ -17,6 +17,7 @@
         "track": "Raide",
         "platform": "Laituri",
         "gate": "Portti",
+        "berth": "Laituri",
         "realtime": "Reaaliaikainen arvio",
         "departures": "Lähtevät",
         "arrivals": "Saapuvat",
