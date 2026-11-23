@@ -777,24 +777,18 @@ describe("the card's height", () => {
             199,
             "min-height: 248px; --departures-spare: 32px",
         ],
-        ["on a whole row already, with nothing over", "grid", {}, 231, "min-height: 248px; --departures-spare: 0px"],
-        ["half a row short, kept there with half rows", "grid", { row_step: "half" }, 199, "min-height: 216px; --departures-spare: 0px"],
+        ["on a whole row already, with nothing over", "grid", {}, 231, "min-height: 248px"],
+        ["half a row short, kept there with half rows", "grid", { row_step: "half" }, 199, "min-height: 216px"],
         ["not outside a sections view", undefined, {}, 199, ""],
         ["not when held to a height", "grid", { height: 400 }, 199, "height: 400px"],
         [
-            "under its limit, on the rows its content needs",
+            "under its limit, on the rows its content needs, centred without a title",
             "grid",
             { max_height: 400 },
             199,
-            "max-height: 376px; min-height: 248px; --departures-spare: 32px",
+            "max-height: 376px; min-height: 248px; --departures-spare: 16px",
         ],
-        [
-            "over its limit, on the limit rounded down to the rows",
-            "grid",
-            { max_height: 400 },
-            900,
-            "max-height: 376px; min-height: 376px; --departures-spare: 0px",
-        ],
+        ["over its limit, on the limit rounded down to the rows", "grid", { max_height: 400 }, 900, "max-height: 376px; min-height: 376px"],
         ["up to its limit as set outside a sections view", undefined, { max_height: 400 }, 199, "max-height: 400px"],
     ])("ends %s", async (_name, layout, extra, bottom, style) => {
         const element = await card(hass({}), extra, layout);
@@ -818,8 +812,8 @@ describe("the card's height", () => {
 
     // The content is 120.4 px, a fraction over two rows, and then 216 px drawn at 0.8, as a dialog opening draws the card.
     it.each([
-        ["a fraction of a pixel over a row, on the next one", 103.4, 1, "min-height: 184px; --departures-spare: 63px"],
-        ["drawn scaled, in the layout's pixels", 199, 0.8, "min-height: 248px; --departures-spare: 32px"],
+        ["a fraction of a pixel over a row, on the next one", 103.4, 1, "min-height: 184px; --departures-spare: 31px"],
+        ["drawn scaled, in the layout's pixels", 199, 0.8, "min-height: 248px; --departures-spare: 16px"],
     ])("ends %s", async (_name, bottom, scale, style) => {
         const element = await card(hass({}), {}, "grid");
         const haCard = element.shadowRoot!.querySelector<HTMLElement>("ha-card")!;
@@ -827,6 +821,35 @@ describe("the card's height", () => {
         haCard.getBoundingClientRect = () => ({ top: 0, width: 454 * scale }) as DOMRect;
         const last = haCard.querySelector<HTMLElement>(":scope > .attribution") ?? haCard.querySelector<HTMLElement>(":scope > .sections")!;
         last.getBoundingClientRect = () => ({ bottom: bottom * scale }) as DOMRect;
+        vi.spyOn(window, "getComputedStyle").mockReturnValue({
+            paddingBottom: "16px",
+            borderBottomWidth: "1px",
+            marginBottom: "4px",
+            marginTop: "0px",
+            width: "454px",
+        } as CSSStyleDeclaration);
+        (element as unknown as { fillRows(): void }).fillRows();
+        vi.restoreAllMocks();
+        await element.updateComplete;
+        expect(haCard.getAttribute("style") ?? "").toBe(style);
+    });
+
+    // Held to 300 px, its stops' box grows to the card's height, so the content ends at the last stop, here with no
+    // attribution under it, and the card's 16 px of padding and 1 px border. The room left over is spread as on filled
+    // rows while it is less than a row, under the title or half above the stops without one.
+    it.each<[string, Partial<DeparturesCardConfig>, number, string]>([
+        ["a little room under the title", { title: "Lähdöt" }, 243, "height: 300px; --departures-spare: 40px"],
+        ["a little room around the stops without a title", {}, 243, "height: 300px; --departures-spare: 20px"],
+        ["a row or more under the stops", { title: "Lähdöt" }, 219, "height: 300px"],
+    ])("held to a height, spreads %s", async (_name, extra, end, style) => {
+        const element = await card(hass({}), { ...extra, height: 300 }, "grid");
+        const haCard = element.shadowRoot!.querySelector<HTMLElement>("ha-card")!;
+        Object.defineProperty(haCard, "clientWidth", { value: 454, configurable: true });
+        haCard.getBoundingClientRect = () => ({ top: 0, width: 454, height: 300 }) as DOMRect;
+        const sections = haCard.querySelector<HTMLElement>(":scope > .sections")!;
+        const stop = document.createElement("section");
+        stop.getBoundingClientRect = () => ({ bottom: end }) as DOMRect;
+        sections.append(stop);
         vi.spyOn(window, "getComputedStyle").mockReturnValue({
             paddingBottom: "16px",
             borderBottomWidth: "1px",

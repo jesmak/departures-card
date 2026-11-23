@@ -29,7 +29,7 @@ import "./editor";
 import { ScrollFade, fadeStyles } from "./fade";
 import type { HassEntity, HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
-import { drawnScale, fillLimit, filledHeight, filledStyle, spareRoom, validRowStep } from "./rows";
+import { drawnScale, fillLimit, filledHeight, filledStyle, heldSpare, spareRoom, validRowStep } from "./rows";
 import { browserLanguage, translate } from "./localize/localize";
 import type { Departure, DeparturesCardConfig, SectionConfig, ShownDeparture } from "./types";
 
@@ -96,7 +96,10 @@ export class DeparturesCard extends LitElement {
     @state() private config?: DeparturesCardConfig;
     /** On automatic rows in a sections view, the height that ends the card on a whole row (or half); 0 when it isn't set. */
     @state() private filled = 0;
-    /** The room that height leaves over, put under the title rather than under the attribution. */
+    /**
+     * The room that height leaves over, or a held card's when it is less than a row, put under the title rather than
+     * under the attribution, or split above and below the stops without a title.
+     */
     @state() private spare = 0;
 
     /** The lines last measured too wide for one line, by their `data-key`, so a render never drops a split. */
@@ -315,13 +318,17 @@ export class DeparturesCard extends LitElement {
      * On automatic rows in a sections view, the card takes the whole rows its content needs, or the half rows with
      * `row_step: half`, so the cards under it stay on the rows, up to the limit of a card that grows up to one. The content is measured to the end of the card's last
      * part, never by the card's own height, which is at least the rows already taken, and less the room already put under
-     * the title, as drawn.
+     * the title, or above the stops without one, as drawn. The room goes under the title, or without one its upper half
+     * goes above the stops, which are centred. A card held to a height that leaves less than a row over its content
+     * spreads that room the same way. Its stops' box grows to whatever height the card has, so its content ends at the
+     * last stop and the attribution under it instead.
      */
     private fillRows(): void {
         const card = this.renderRoot.querySelector<HTMLElement>("ha-card");
         const last = card?.querySelector<HTMLElement>(":scope > .attribution") ?? card?.querySelector<HTMLElement>(":scope > .sections");
         const limit = fillLimit(this.config ?? {}, this.layout, this.minimumHeight());
-        if (!card || !last || !card.clientWidth || !limit) {
+        const held = !limit && Boolean(heightStyle(this.config ?? {}, this.layout, this.minimumHeight()));
+        if (!card || !last || !card.clientWidth || (!limit && !held)) {
             if (this.filled) this.filled = 0;
             if (this.spare) this.spare = 0;
             return;
@@ -334,6 +341,25 @@ export class DeparturesCard extends LitElement {
             : sections
               ? parseFloat(getComputedStyle(sections).marginTop) || 0
               : 0;
+        if (held) {
+            // To the last stop's end and the attribution under it, as the stops' box grows to the card's height unless
+            // the room is spread.
+            const scale = drawnScale(card);
+            const stop = sections?.querySelector<HTMLElement>(":scope > section:last-of-type") ?? sections;
+            const attribution = card.querySelector<HTMLElement>(":scope > .attribution");
+            const content =
+                ((stop?.getBoundingClientRect().bottom ?? 0) - card.getBoundingClientRect().top) / scale +
+                (attribution
+                    ? attribution.getBoundingClientRect().height / scale + (parseFloat(getComputedStyle(attribution).marginTop) || 0)
+                    : 0) +
+                (parseFloat(style.paddingBottom) || 0) +
+                (parseFloat(style.borderBottomWidth) || 0) -
+                Math.max(0, shown);
+            const spare = heldSpare(card.getBoundingClientRect().height / scale, content);
+            if (this.filled) this.filled = 0;
+            if (spare !== this.spare) this.spare = spare;
+            return;
+        }
         // The drawn distance unscaled, as the padding and border added to it are the layout's.
         const content =
             (last.getBoundingClientRect().bottom - card.getBoundingClientRect().top) / drawnScale(card) +
@@ -402,11 +428,18 @@ export class DeparturesCard extends LitElement {
         ];
         const height = heightStyle(this.config, this.layout, this.minimumHeight());
         const attribution = attributions.join(" · ");
-        const classes = [this.config.full_texts && "full", height && "held", this.filled && "filled", this.config.title && "titled"]
+        const classes = [
+            this.config.full_texts && "full",
+            height && "held",
+            (this.filled || this.spare) && "filled",
+            this.config.title && "titled",
+        ]
             .filter(Boolean)
             .join(" ");
         const filled = filledStyle(this.config, this.layout, this.minimumHeight(), this.filled);
-        const style = this.filled ? `${filled}; --departures-spare: ${this.spare}px` : filled;
+        // Without a title the stops are centred, so the upper half of the room goes above them.
+        const spare = this.config.title ? this.spare : Math.floor(this.spare / 2);
+        const style = spare ? [filled, `--departures-spare: ${spare}px`].filter(Boolean).join("; ") : filled;
         return html`
             <ha-card class=${classes} style=${style}>
                 ${this.config.title ? html`<h1 class="card-title" title=${this.config.title}>${this.config.title}</h1>` : nothing}
@@ -723,7 +756,7 @@ export class DeparturesCard extends LitElement {
                  * The heights step in units of 32 px, half a row of a sections view (56 px and an 8 px gap): each later
                  * departure 32, the title 32 and each stop under another 128. The card ends on a half row or a whole one by
                  * its content, and fillRows rounds it to whole rows unless row_step is half. The room that leaves goes under
-                 * the title, or at the top without one.
+                 * the title, or without one its upper half goes above the stops.
                  */
                 .card-title {
                     margin: 0 0 calc(4px + var(--departures-spare, 0px));
@@ -1316,8 +1349,9 @@ export class DeparturesCard extends LitElement {
                     align-content: start;
                 }
 
-                /* Filling its rows up to a limit, the stops shrink but never grow, as the room left over goes under the
-                   title and fillRows would otherwise measure it as content, keeping the card from ever shrinking. */
+                /* Filling its rows up to a limit, or held with less than a row to spare, the stops shrink but never grow, as
+                   the room left over goes under the title and fillRows would otherwise measure it as content, keeping the
+                   card from ever shrinking. */
                 .held.filled .sections {
                     flex-grow: 0;
                 }
