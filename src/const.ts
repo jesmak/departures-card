@@ -1,3 +1,5 @@
+import type { ScrollIndicator } from "./fade";
+
 /** Replaced at build time with the version in package.json. */
 declare const __CARD_VERSION__: string;
 
@@ -7,6 +9,9 @@ export const CARD_VERSION = __CARD_VERSION__;
 export const DEPARTURES_VERSION = 1;
 
 export const DEFAULT_DEPARTURES = 4;
+
+/** A held card's later departures show both their fading edges and a thin scrollbar. */
+export const DEFAULT_SCROLL_INDICATOR: ScrollIndicator = "both";
 
 /** A departure is hidden once it is this far in the past, so a sensor that updates once a minute doesn't show a bus that has gone. */
 export const GONE_AFTER_MS = 60_000;

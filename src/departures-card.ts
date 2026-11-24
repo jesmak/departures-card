@@ -10,7 +10,7 @@ import type { CSSResultGroup, PropertyValues, TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 
-import { CARD_VERSION, DEFAULT_DEPARTURES, MODE_ICONS, TICK_MS } from "./const";
+import { CARD_VERSION, DEFAULT_DEPARTURES, DEFAULT_SCROLL_INDICATOR, MODE_ICONS, TICK_MS } from "./const";
 import {
     badgeColors,
     clock,
@@ -26,7 +26,7 @@ import {
     visibleDepartures,
 } from "./departures";
 import "./editor";
-import { ScrollFade, fadeStyles } from "./fade";
+import { ScrollFade, fadeStyles, scrollIndicator, validScrollIndicator } from "./fade";
 import type { HassEntity, HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
 import { drawnScale, fillLimit, filledHeight, filledStyle, heldSpare, spareRoom, validRowStep } from "./rows";
@@ -111,8 +111,10 @@ export class DeparturesCard extends LitElement {
     constructor() {
         super();
         // Fades the edges of each stop's later departures while the card is held to a height, through the card's own lifecycle.
-        new ScrollFade(this, () =>
-            this.renderRoot.querySelector("ha-card.held") ? this.renderRoot.querySelectorAll<HTMLElement>("section > .rows") : [],
+        new ScrollFade(
+            this,
+            () => (this.renderRoot.querySelector("ha-card.held") ? this.renderRoot.querySelectorAll<HTMLElement>("section > .rows") : []),
+            () => scrollIndicator(this.config ?? {}, DEFAULT_SCROLL_INDICATOR),
         );
     }
 
@@ -141,6 +143,9 @@ export class DeparturesCard extends LitElement {
         }
         if (!validRowStep(config)) {
             throw new Error(translate(browserLanguage(), "common.invalid_row_step"));
+        }
+        if (!validScrollIndicator(config)) {
+            throw new Error(translate(browserLanguage(), "common.invalid_scroll_indicator"));
         }
         this.config = { ...config, entities };
     }

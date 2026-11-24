@@ -6,6 +6,7 @@
         "invalid_departures": "Virheellinen konfiguraatio. Lähtöjen määrän pitää olla kokonaisluku, vähintään 1.",
         "invalid_height": "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikseleinä, ja korkeustilan (height_mode) auto, fixed tai max.",
         "invalid_row_step": "Virheellinen pyöristys. Pyöristyksen (row_step) on oltava full tai half.",
+        "invalid_scroll_indicator": "Virheellinen scroll_indicator. Sen on oltava both, fade tai scrollbar.",
         "no_entities": "Ei vielä pysäkkejä. Lisää pysäkkianturi kortin asetuksista.",
         "no_entity": "Entiteettiä {entity} ei löydy",
         "not_departures": "{entity} ei ole pysäkkianturi",
@@ -50,6 +51,11 @@
         "row_step": "Pyöristys osioihin jaetussa näkymässä",
         "row_step_helper": "Automaattisella rivikorkeudella kortin korkeus pyöristetään ylöspäin kokonaisiin riveihin, tai tilan säästämiseksi puolikkaisiin riveihin.",
         "row_step_full": "Kokonaisiin riveihin",
-        "row_step_half": "Puolikkaisiin riveihin"
+        "row_step_half": "Puolikkaisiin riveihin",
+        "scroll_indicator": "Vieritys",
+        "scroll_indicator_helper": "Näkyy, kun kortin korkeus on rajattu eikä koko sisältö mahdu siihen",
+        "scroll_indicator_both": "Häivytetty reuna ja vierityspalkki",
+        "scroll_indicator_fade": "Häivytetty reuna",
+        "scroll_indicator_scrollbar": "Vierityspalkki"
     }
 }

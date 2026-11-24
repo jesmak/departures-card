@@ -1,13 +1,14 @@
 /**
  * The card's visual editor: the title, the stops with their headings, how many departures each shows, cancelled ones,
  * notices, whether texts are shown in full, whether the stops are one list, and how the card rounds its height to the
- * rows of a sections view. Its height mode is set in YAML only.
+ * rows of a sections view, and how a list that scrolls shows that there is more. Its height mode is set in YAML only.
  */
 import { LitElement, css, html, nothing } from "lit";
 import type { CSSResultGroup, TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
-import { DEFAULT_DEPARTURES } from "./const";
+import { DEFAULT_DEPARTURES, DEFAULT_SCROLL_INDICATOR } from "./const";
+import { scrollIndicatorData, scrollIndicatorSchema, tidyScrollIndicator } from "./fade";
 import { departuresSensors, sectionsOf } from "./departures";
 import type { HomeAssistant } from "./hass";
 import { rowStepData, rowStepSchema, tidyRowStep } from "./rows";
@@ -67,6 +68,7 @@ function optionsSchema(config: DeparturesCardConfig, text: (key: string) => stri
             ],
         },
         ...rowStepSchema(config, text),
+        ...scrollIndicatorSchema(text),
     ];
 }
 
@@ -96,7 +98,7 @@ export function compactSections(sections: SectionConfig[]): Array<string | Secti
 
 /** The form's values as the card's configuration, with the stops compacted and empty values and defaults left out. */
 export function configFromForm(value: DeparturesCardConfig): DeparturesCardConfig {
-    const config: DeparturesCardConfig = tidyRowStep(value);
+    const config: DeparturesCardConfig = tidyScrollIndicator(tidyRowStep(value), DEFAULT_SCROLL_INDICATOR);
     config.entities = compactSections((config.entities ?? []) as SectionConfig[]);
     if (!config.title) {
         delete config.title;
@@ -124,7 +126,7 @@ export class DeparturesCardEditor extends LitElement {
             return nothing;
         }
         // The form edits every stop as an object; plain entity ids are expanded for it.
-        const data = formData(rowStepData(this.config));
+        const data = formData(scrollIndicatorData(rowStepData(this.config), DEFAULT_SCROLL_INDICATOR));
         // Two forms, so that the stops' helper, which Home Assistant's list of objects doesn't show, sits under the stops.
         return html`
             <ha-form
