@@ -321,12 +321,12 @@ describe("departures-card", () => {
             text((await card(hass({ "sensor.kauppatori": [departure("a", 5), ...rows] }), {})).shadowRoot!.querySelector(".rule"));
         expect(await rule([departure("b", 9)])).toBe("");
         expect(await rule([departure("b", 9, { mode: "train", platform: "1" }), departure("c", 12, { platform: "7" })])).toBe("");
-        // A landing plane's hall isn't on its row, and neither is a cancelled departure's platform.
-        const hall = hass({ "sensor.kauppatori": [departure("a", 5), departure("b", 9, { mode: "plane", platform: "2B" })] });
-        hall.states["sensor.kauppatori"]!.attributes.direction = "arrivals";
-        const landing = (await card(hall, {})).shadowRoot!;
-        expect(text(landing.querySelector(".rule"))).toBe("");
-        expect(landing.querySelector(".row .platform")).toBeNull();
+        // A landing plane's is its area. A cancelled departure's platform isn't on its row.
+        const area = hass({ "sensor.kauppatori": [departure("a", 5), departure("b", 9, { mode: "plane", platform: "2B" })] });
+        area.states["sensor.kauppatori"]!.attributes.direction = "arrivals";
+        const landing = (await card(area, {})).shadowRoot!;
+        expect(text(landing.querySelector(".rule"))).toBe("Alue");
+        expect(text(landing.querySelector(".row .platform"))).toBe("2B");
         expect(await rule([departure("b", 9, { platform: "7", cancelled: true })])).toBe("");
     });
 
@@ -1214,7 +1214,7 @@ describe("a departure's popup", () => {
         expect(text(popup.querySelector(".late"))).toBe("+10 min");
     });
 
-    it("shows a landed plane in green with its hall, which its row leaves out", async () => {
+    it("shows a landed plane in green with its area", async () => {
         const state = hass({
             "sensor.kauppatori": [
                 departure("a", 4),
@@ -1224,10 +1224,30 @@ describe("a departure's popup", () => {
         state.states["sensor.kauppatori"]!.attributes.direction = "arrivals";
         const element = await card(state, {});
         const row = element.shadowRoot!.querySelector(".row.came-in")!;
-        expect(row.querySelector(".platform")).toBeNull();
+        expect(text(row.querySelector(".platform"))).toBe("2B");
         const popup = await open(element, ".row.came-in");
         expect(text(popup.querySelector(".arrived"))).toBe("Maassa");
-        expect(text(popup)).toBe("55 Malaga Tila Maassa Aikataulu 16.54 Aula 2B");
+        expect(text(popup)).toBe("55 Malaga Tila Maassa Aikataulu 16.54 Alue 2B");
+    });
+
+    it("tones the door a bus gets in a list of both directions as a plane's icon", async () => {
+        const state = hass({
+            "sensor.kauppatori": [
+                departure("a", 4),
+                departure("b", 9, { notice: "Kiertotie" }),
+                departure("c", 15, { cancelled: true, notice: "Lakko" }),
+            ],
+            "sensor.east": [departure("d", 2, { arrived: true }), departure("e", 12)],
+        });
+        state.states["sensor.east"]!.attributes.direction = "arrivals";
+        const root = (await card(state, { entities: ["sensor.kauppatori", "sensor.east"], combine: true, departures: 6 })).shadowRoot!;
+        const doors = [...root.querySelectorAll(".row .direction")].map((icon) => `${icon.getAttribute("icon")} ${icon.className}`);
+        expect(doors).toEqual([
+            "mdi:location-enter direction landed",
+            "mdi:location-exit direction noted",
+            "mdi:location-enter direction ",
+            "mdi:location-exit direction ",
+        ]);
     });
 
     it("gives a departure with a notice and no direction icon an info sign", async () => {

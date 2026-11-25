@@ -97,7 +97,8 @@ masonry or panel view, or a stack or other card the card is inside, even in a se
   route known only by its stops.
 - **Track, platform, gate or berth:** a train's track, a plane's gate, a ship's or ferry's berth, or another vehicle's
   platform, when the stop has them, as its number at the end of the line. What the number is, such as Track or Gate,
-  is said once, at the end of the divider above the later departures. An arriving plane's baggage hall is in its popup.
+  is said once, at the end of the divider above the later departures. An arriving plane's is its area, such as
+  a baggage hall.
 - **Cancellations:** a cancelled departure stays in the list, greyed and struck through, and says so at the end of its
   line. The reason is in its popup when the integration gives one. It is counted in the number of departures, so the list is as long whatever is cancelled. It is
   never the large one, which is always the next departure you can actually take, even when a run of cancellations
@@ -109,7 +110,7 @@ masonry or panel view, or a stack or other card the card is inside, even in a se
   one is the next arrival still to come.
 - **Which way it goes:** a plane's or a train's large departure or arrival has an icon in front of its destination or
   origin, a plane's takeoff or landing and a train's exit or entry door. In one list of both directions (`combine`),
-  every plane and train has it, so the departures and arrivals can be told apart.
+  every departure and arrival has one, so they can be told apart. Buses, ships and the rest get the door there too.
 - **Notices:** a notice about the departure itself, such as "Passengers are directed to train S 106", is in its popup.
   Its line tells of it with its direction icon in the theme's accent colour, or with an info sign where it has no such
   icon. The stop's own notices, such as track works with buses replacing trains, are each on a line of its own under
@@ -236,8 +237,8 @@ Nothing needs changing in the card's configuration. Three things look different:
 
 - A card set narrower than a whole section in a sections view is widened to one, as the card's least width is now 12
   columns.
-- A departure's notice, the word for one that has landed or arrived, its timetable time and an arriving plane's hall
-  have moved from its line to its popup.
+- A departure's notice, the word for one that has landed or arrived and its timetable time have moved from its line
+  to its popup.
 - A card held to a height can be given fewer rows than before, as a departure no longer needs room for a second line.
 
 ## Data

@@ -150,7 +150,14 @@ describe("sections", () => {
 
 describe("shownDepartures", () => {
     it("skips departures missing what a row needs", () => {
-        const broken = [{ id: "x", mode: "bus" }, { ...departure("y", 3), estimated: "soon" }, null] as unknown as Departure[];
+        const broken = [
+            { id: "x", mode: "bus" },
+            { ...departure("y", 3), estimated: "soon" },
+            { ...departure("z", 3), id: undefined },
+            { ...departure("", 3) },
+            { ...departure("w", 3), id: 5 },
+            null,
+        ] as unknown as Departure[];
         expect(shownDepartures("sensor.x", sensor([...broken, departure("ok", 4)]), false).map((item) => item.id)).toEqual(["ok"]);
     });
 

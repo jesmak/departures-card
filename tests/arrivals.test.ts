@@ -65,6 +65,15 @@ const titled = (expected: string[]) => expected.map((icon) => `${icon} ${TITLES[
 const DEPARTURES = { departures: [flight("ay1", 10), flight("ay3", 40)], direction: "departures" } satisfies Sensor;
 const ARRIVALS = { departures: [flight("ay2", 20), flight("ay4", 50)], direction: "arrivals" } satisfies Sensor;
 const BUSES = { departures: [flight("55", 15, { mode: "bus" }), flight("16", 45, { mode: "bus" })] } satisfies Sensor;
+// A port's ships and ferries, which have no direction icons of their own.
+const SHIPS = {
+    departures: [flight("s2", 12, { mode: "ferry" }), flight("s4", 42, { mode: "ship" })],
+    direction: "departures",
+} satisfies Sensor;
+const SHIP_ARRIVALS = {
+    departures: [flight("s1", 8, { mode: "ship" }), flight("s3", 38, { mode: "ferry" })],
+    direction: "arrivals",
+} satisfies Sensor;
 // A station's trains: today's departures write no direction, and its arrivals do.
 const TRAINS = { departures: [flight("ic10", 12, { mode: "train" }), flight("ic12", 42, { mode: "train" })] } satisfies Sensor;
 const TRAIN_ARRIVALS = {
@@ -83,7 +92,8 @@ describe("arrivals and directions", () => {
     });
 
     // Where the direction icons go: the large row always has one on a plane or a train, the rows only in one list that has
-    // both directions in it. A card of one direction says it in its subtitle, and buses have no direction to show.
+    // both directions in it. A card of one direction says it in its subtitle, and buses and ships show theirs, by the
+    // door, only in such a list.
     it.each([
         ["departures alone", ["sensor.lahtevat"], false, ["mdi:airplane-takeoff"], []],
         ["arrivals alone", ["sensor.saapuvat"], false, ["mdi:airplane-landing"], []],
@@ -154,8 +164,16 @@ describe("arrivals and directions", () => {
             "buses and arrivals in one list",
             ["sensor.bussit", "sensor.saapuvat"],
             true,
-            [],
-            ["mdi:airplane-landing", "mdi:airplane-landing"],
+            ["mdi:location-exit"],
+            ["mdi:airplane-landing", "mdi:location-exit", "mdi:airplane-landing"],
+        ],
+        ["a port's arrivals", ["sensor.laivat_saapuvat"], false, [], []],
+        [
+            "a port both ways in one list",
+            ["sensor.laivat", "sensor.laivat_saapuvat"],
+            true,
+            ["mdi:location-enter"],
+            ["mdi:location-exit", "mdi:location-enter", "mdi:location-exit"],
         ],
     ])("icons: %s", async (_case, entities, combine, large, rows) => {
         const state = hass({
@@ -163,6 +181,8 @@ describe("arrivals and directions", () => {
             "sensor.saapuvat": ARRIVALS,
             "sensor.toinen": { ...DEPARTURES, stop_name: "Toinen" },
             "sensor.bussit": BUSES,
+            "sensor.laivat": SHIPS,
+            "sensor.laivat_saapuvat": SHIP_ARRIVALS,
             "sensor.juna": TRAINS,
             "sensor.junat_saapuvat": TRAIN_ARRIVALS,
             "sensor.junat_lahtevat": { ...TRAINS, direction: "departures" },
@@ -189,7 +209,7 @@ describe("arrivals and directions", () => {
         ]);
     });
 
-    it("shows a landed flight's delay on its row, and its other notice and hall in its popup", async () => {
+    it("shows a landed flight's delay and area on its row, and its other notice in its popup", async () => {
         const late = flight("ay5", -12, {
             arrived: true,
             realtime: true,
@@ -200,11 +220,11 @@ describe("arrivals and directions", () => {
         const state = hass({ "sensor.saapuvat": { departures: [late, flight("ay6", 5)], direction: "arrivals" } });
         const element = await card(state, { entities: ["sensor.saapuvat"] });
         const row = element.shadowRoot!.querySelector<HTMLElement>(".row.came-in")!;
-        expect(text(row)).toBe("+13 min 11.48 AY5 Oulu");
+        expect(text(row)).toBe("+13 min·2A 11.48 AY5 Oulu");
         row.click();
         await element.updateComplete;
         expect(text(element.shadowRoot!.querySelector(".details"))).toBe(
-            "AY5 Oulu Tila Maassa, Matkatavarat myöhässä Aikataulu 11.35 Arvio 11.48 +13 min Aula 2A",
+            "AY5 Oulu Tila Maassa, Matkatavarat myöhässä Aikataulu 11.35 Arvio 11.48 +13 min Alue 2A",
         );
     });
 
@@ -244,10 +264,9 @@ describe("arrivals and directions", () => {
         const root = (await card(state, { entities: ["sensor.saapuvat"] })).shadowRoot!;
         expect(text(root.querySelector(".next .headsign"))).toBe("Oulu");
         expect(text(root.querySelector(".next .countdown"))).toBe("5 min");
-        // A hall isn't on a line, only in its popup.
-        expect(root.querySelector(".next .platform")).toBeNull();
+        expect(text(root.querySelector(".next .platform"))).toBe("2B");
         const row = root.querySelector(".row.came-in");
-        expect(text(row)).toBe("11.48 AY5 Oulu");
+        expect(text(row)).toBe("2A 11.48 AY5 Oulu");
         expect(row?.querySelector(".alert")).toBeNull();
     });
 
@@ -280,11 +299,11 @@ describe("arrivals and directions", () => {
         expect(root.querySelectorAll("section")).toHaveLength(1);
         expect(text(root.querySelector(".heading"))).toBe("Esimerkkilä");
         expect(text(root.querySelector(".next .badge")), "an arrival is the soonest").toBe("AY2");
-        expect(root.querySelector(".next .platform")).toBeNull();
+        expect(text(root.querySelector(".next .platform"))).toBe("2A");
         expect([...root.querySelectorAll(".row .badge")].map(text)).toEqual(["AY1", "AY3", "AY4"]);
-        // The departures' gates, named once at the end of the divider. The arrivals' halls are in their popups.
-        expect([...root.querySelectorAll(".row .platform")].map(text)).toEqual(["12", "14"]);
-        expect(text(root.querySelector(".rule"))).toBe("Portti");
+        // Gates and an area among the rows, so the divider names neither.
+        expect([...root.querySelectorAll(".row .platform")].map(text)).toEqual(["12", "14", "2B"]);
+        expect(text(root.querySelector(".rule"))).toBe("");
     });
 
     // A single list's heading and empty text, from the directions its sensors state and whether they can be shown.

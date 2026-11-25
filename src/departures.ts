@@ -88,6 +88,8 @@ function isDeparture(value: unknown): value is Departure {
     return (
         typeof departure === "object" &&
         departure !== null &&
+        typeof departure.id === "string" &&
+        departure.id !== "" &&
         typeof departure.line === "string" &&
         !Number.isNaN(Date.parse(departure.estimated)) &&
         !Number.isNaN(Date.parse(departure.scheduled))

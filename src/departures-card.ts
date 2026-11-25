@@ -53,19 +53,18 @@ function hasPopovers(): boolean {
     return "showPopover" in HTMLElement.prototype;
 }
 
-/**
- * Where a departure leaves from, when its line shows it: not for a cancelled one, and not a landing plane's hall,
- * which matters less than a gate and is in the popup.
- */
+/** Where a departure leaves from or an arrival is met, when its line shows it: not for a cancelled one. */
 function shownPlatform(departure: ShownDeparture): string | undefined {
-    const hidden = departure.cancelled || (departure.mode === "plane" && departure.direction === "arrivals");
-    return hidden ? undefined : departure.platform || undefined;
+    return departure.cancelled ? undefined : departure.platform || undefined;
 }
 
-/** The icons that show which way a departure goes, by mode. */
+/** Leaving or coming in by a door, for a mode with no icons of its own: no icon shows a train or a ship arriving. */
+const DOORS = { departing: "mdi:location-exit", arriving: "mdi:location-enter" };
+
+/** The icons that show which way a departure goes, for the modes that always show it. */
 const DIRECTION_ICONS: Record<string, { departing: string; arriving: string }> = {
     plane: { departing: "mdi:airplane-takeoff", arriving: "mdi:airplane-landing" },
-    train: { departing: "mdi:location-exit", arriving: "mdi:location-enter" },
+    train: DOORS,
 };
 
 console.info(
@@ -515,13 +514,16 @@ export class DeparturesCard extends LitElement {
         return undefined;
     }
 
-    /** A section's notices, its next departure large and the rest as rows. `rowIcons` marks each row's direction. */
+    /**
+     * A section's notices, its next departure large and the rest as rows. `mixed` is a list of both directions, where
+     * every departure shows which way it goes.
+     */
     private list(
         heading: TemplateResult,
         entities: HassEntity[],
         departures: ShownDeparture[],
         arrivals: boolean,
-        rowIcons = false,
+        mixed = false,
     ): TemplateResult {
         const notices =
             this.config?.show_notices === false ? [] : [...new Set(entities.flatMap((entity) => stopNotices(entity.attributes.notices)))];
@@ -548,7 +550,7 @@ export class DeparturesCard extends LitElement {
                             <ha-icon icon="mdi:alert-outline"></ha-icon><span>${notice}</span>
                         </div>`,
                 )}
-                ${next ? this.next(next, keyOf(next)) : nothing}
+                ${next ? this.next(next, keyOf(next), mixed) : nothing}
                 ${
                     rest.length
                         ? html`<div class="rule">${labels.size === 1 ? html`<span>${[...labels][0]}</span>` : nothing}</div>
@@ -558,7 +560,7 @@ export class DeparturesCard extends LitElement {
                                   ${repeat(
                                       rest,
                                       (departure) => departure.key,
-                                      (departure) => this.row(departure, keyOf(departure), rowIcons),
+                                      (departure) => this.row(departure, keyOf(departure), mixed),
                                   )}
                               </div>`
                         : nothing
@@ -576,7 +578,7 @@ export class DeparturesCard extends LitElement {
      * The next departure: what, where to, and how soon, with its delay and gate under its destination. The rest is in
      * its popup, as a later departure's is.
      */
-    private next(departure: ShownDeparture, key: string): TemplateResult {
+    private next(departure: ShownDeparture, key: string, mixed: boolean): TemplateResult {
         const minutes = minutesUntil(departure.estimated, Date.now());
         const countdown =
             minutes === null
@@ -590,7 +592,7 @@ export class DeparturesCard extends LitElement {
                 <span class="countdown">${countdown}</span>
                 ${this.badge(departure, "large")}
                 <span class="next-text">
-                    <span class="headsign" title=${departure.headsign ?? nothing}>${this.destination(departure, true)}</span>
+                    <span class="headsign" title=${departure.headsign ?? nothing}>${this.destination(departure, true, mixed)}</span>
                     <span class="meta">${this.live(departure)}${this.end(departure, true)}</span>
                 </span>
             </button>
@@ -601,7 +603,7 @@ export class DeparturesCard extends LitElement {
      * A later departure on one line: its time, line and destination, and at its end how late it is and where it
      * leaves from. One that has come in is dimmed. Whatever else it says is in its popup, which its icon tells of.
      */
-    private row(departure: ShownDeparture, key: string, icon: boolean): TemplateResult {
+    private row(departure: ShownDeparture, key: string, mixed: boolean): TemplateResult {
         const cancelled = !!departure.cancelled;
         const arrived = !cancelled && !!departure.arrived;
         // The end comes first, as with texts shown in full it floats at the end of the first line.
@@ -613,7 +615,7 @@ export class DeparturesCard extends LitElement {
                 ${this.end(departure)}
                 <span class="time ${cancelled ? "struck" : ""}">${this.when(cancelled ? departure.scheduled : departure.estimated)}</span>
                 ${this.badge(departure, "small")}
-                <span class="headsign" title=${departure.headsign ?? nothing}>${this.destination(departure, icon)}</span>
+                <span class="headsign" title=${departure.headsign ?? nothing}>${this.destination(departure, mixed, mixed)}</span>
             </button>
         `;
     }
@@ -643,21 +645,22 @@ export class DeparturesCard extends LitElement {
     }
 
     /** A destination with its icon, which stays with its first word when the text wraps. */
-    private destination(departure: ShownDeparture, direction: boolean): TemplateResult {
+    private destination(departure: ShownDeparture, direction: boolean, mixed = false): TemplateResult {
         const [first, ...rest] = (departure.headsign ?? "").split(" ");
-        return html`<span class="first">${this.statusIcon(departure, direction)}${first}</span>${rest.length ? ` ${rest.join(" ")}` : ""}`;
+        return html`<span class="first">${this.statusIcon(departure, direction, mixed)}${first}</span
+            >${rest.length ? ` ${rest.join(" ")}` : ""}`;
     }
 
     /**
-     * Which way a plane or a train goes, in front of its destination or origin: a plane takes off or lands, a train
-     * leaves or comes in by a door, as no icon shows a train arriving. Buses and the rest have no direction to show.
+     * Which way a departure goes, in front of its destination or origin: a plane takes off or lands, a train leaves or
+     * comes in by a door. Buses and the rest say it only in a list of both directions (`mixed`), by the door too.
      * The icon also tells of what is in the popup: in the accent colour for a departure with a notice, in green for one
      * that has come in. A departure with a notice and no direction icon gets an info sign instead.
      */
-    private statusIcon(departure: ShownDeparture, direction: boolean): TemplateResult | typeof nothing {
-        const icons = DIRECTION_ICONS[departure.mode];
+    private statusIcon(departure: ShownDeparture, direction: boolean, mixed: boolean): TemplateResult | typeof nothing {
+        const icons = direction ? (DIRECTION_ICONS[departure.mode] ?? (mixed ? DOORS : undefined)) : undefined;
         const tone = departure.cancelled ? "" : departure.notice ? "noted" : departure.arrived ? "landed" : "";
-        if (icons && direction) {
+        if (icons) {
             const arriving = departure.direction === "arrivals";
             return html`<ha-icon
                 class="direction ${tone}"
@@ -811,11 +814,11 @@ export class DeparturesCard extends LitElement {
         >`;
     }
 
-    /** A train leaves from a track, a plane from a gate and lands into a hall, a ship from a berth, everything else from a platform. */
+    /** A train leaves from a track, a plane from a gate, a ship from a berth, everything else from a platform. A landing plane is met in an area. */
     private platformLabel(departure: ShownDeparture): string {
         const labels: Record<string, string> = {
             train: "common.track",
-            plane: departure.direction === "arrivals" ? "common.hall" : "common.gate",
+            plane: departure.direction === "arrivals" ? "common.area" : "common.gate",
             ferry: "common.berth",
             ship: "common.berth",
         };

@@ -84,7 +84,7 @@ that changes on its own, such as "in 4 min".
 Fields the card doesn't know are ignored.
 
 The card translates only what it renders itself, such as "now", minutes, clock times, delays, tracks, platforms,
-gates and halls, "cancelled", "landed" and "arrived", and the departures and arrivals headings. Everything else, such
+gates and areas, "cancelled", "landed" and "arrived", and the departures and arrivals headings. Everything else, such
 as names, headsigns and notices, comes from the source in its own words.
 
 ### How the card shows times
@@ -98,8 +98,8 @@ show texts in full.
 ### How the card shows the rest
 
 A departure's line has room for little, so the card puts on it only how late or early the departure is and its
-`platform`, as the bare value, and names the platform once above the list. A landing plane's `platform`, its baggage
-hall, is left off its line. Everything else is in the popup that opens when the line is clicked. It has the departure's
+`platform`, as the bare value, and names the platform once above the list. A landing plane's `platform`, such as its
+baggage hall, is called its area. Everything else is in the popup that opens when the line is clicked. It has the departure's
 `notice` in full, its `scheduled` and `estimated` times, its `platform` with its name, and that it is cancelled or has
 come in. A departure with a `notice` is marked on its line, so the notice is worth giving only when it says something.
 
@@ -115,7 +115,8 @@ delay, and the card says in its popup that it has arrived, in its own words. A c
 covers every arrival it lists. That is the large one, which is the next arrival still to come that isn't cancelled,
 the cancelled ones, and up to the latest two that are over, come in or cancelled and past their time. The card
 names a sensor's direction under its name when the sensor says one, and shows a plane's or a train's direction as an
-icon, always on the large one, and on every row in a list of both directions.
+icon, always on the large one, and on every row in a list of both directions. In such a list every other mode gets an
+icon as well.
 
 ## Rules for sources
 
