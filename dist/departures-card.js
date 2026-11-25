@@ -2167,10 +2167,12 @@ var DeparturesCard = class extends i4 {
 
                 /* The next departure is always 44 px: its destination is cut short rather than moved to a line of its own, so
                    the card's height never comes from what a departure says. */
+                /* As tall with nothing under its destination, which is then centred, so its height doesn't follow its data. */
                 .next {
                     display: flex;
                     align-items: center;
                     gap: 14px;
+                    min-height: 44px;
                     margin-top: 10px;
                     padding: 0;
                 }
@@ -2201,12 +2203,10 @@ var DeparturesCard = class extends i4 {
                     white-space: nowrap;
                 }
 
-                /* As tall with nothing to say, so the large departure's height doesn't follow its data. */
                 .meta {
                     display: flex;
                     align-items: center;
                     gap: 6px;
-                    min-height: 18px;
                     line-height: 18px;
                 }
 
