@@ -59,9 +59,9 @@ you make one, give its repository the topic too. A template entity can write the
 | `entities`         | list    | Departures sensors, each shown as a section or all as one list with `combine`, as an entity id or one with its heading                                                                                                                                             | required                                                                        |
 | `title`            | string  | Shown at the top of the card                                                                                                                                                                                                                                       |                                                                                 |
 | `departures`       | number  | How many departures each stop shows, or the whole list with `combine`, the large one, cancelled ones and up to two arrivals that are over included                                                                                                                 | `4`                                                                             |
-| `show_cancelled`   | boolean | Show cancelled departures, struck through with the reason                                                                                                                                                                                                          | `true`                                                                          |
+| `show_cancelled`   | boolean | Show cancelled departures, struck through                                                                                                                                                                                                                          | `true`                                                                          |
 | `show_notices`     | boolean | Show the stop's notices, such as track works, under its name                                                                                                                                                                                                       | `true`                                                                          |
-| `full_texts`       | boolean | Wrap every text the card would otherwise cut short                                                                                                                                                                                                                 | `false`                                                                         |
+| `full_texts`       | boolean | Show every text the card would otherwise cut short in full                                                                                                                                                                                                         | `false`                                                                         |
 | `combine`          | boolean | Show every stop's departures and arrivals as one list by time, not a section each                                                                                                                                                                                  | `false`                                                                         |
 | `height_mode`      | string  | How tall the card is. `auto` fits its content, `fixed` keeps it at `height`, `max` lets it grow up to `max_height`. In `fixed` and `max` the later departures scroll. A height in grid rows, set in the layout tab of a sections view, is used instead             | `fixed` when `height` is set, `max` when only `max_height` is, otherwise `auto` |
 | `height`           | number  | The card's height in pixels, for `fixed`                                                                                                                                                                                                                           |                                                                                 |
@@ -86,35 +86,40 @@ masonry or panel view, or a stack or other card the card is inside, even in a se
 - **How soon it leaves:** "now" under a minute, minutes under an hour, and the clock time after that. A time that
   isn't today has its weekday in front ("Mon 06:15"), and one a week or more away its date. The countdown runs on
   between the sensor's updates, and a departure more than a minute gone is hidden.
-- **Live times:** the large departure has a live icon when it is tracked in real time. When it is late or early, its
-  timetable time is struck through next to the estimate, with the difference in minutes. A later departure shows its
-  estimate with the difference.
+- **Live times:** the large departure has a live icon when it is tracked in real time, and says "On time" when its
+  estimate is its timetable time. A departure that is late or early shows its estimate, with the difference in minutes
+  at the end of its line.
+- **Details in a popup:** a departure's line shows only what matters at a glance. Clicking it opens a popup with the
+  rest, which is its timetable time and estimate, its track or gate by name, its notice in full, and whether it is
+  cancelled or has come in, in the same colours as on the card. Its close button, a click on the same line, a click elsewhere or Esc closes it.
 - **The line's colour**, when the integration gives one, otherwise a colour by vehicle type.
 - **The vehicle type's icon** in the badge of a line that has no number or name of its own, such as a rural bus
   route known only by its stops.
 - **Track, platform, gate or berth:** a train's track, a plane's gate, a ship's or ferry's berth, or another vehicle's
-  platform, when the stop has them. An arriving plane's is its baggage hall.
-- **Cancellations:** a cancelled departure stays in the list, greyed and struck through, with the reason when the
-  integration gives one. It is counted in the number of departures, so the list is as long whatever is cancelled. It is
+  platform, when the stop has them, as its number at the end of the line. What the number is, such as Track or Gate,
+  is said once, at the end of the divider above the later departures. An arriving plane's baggage hall is in its popup.
+- **Cancellations:** a cancelled departure stays in the list, greyed and struck through, and says so at the end of its
+  line. The reason is in its popup when the integration gives one. It is counted in the number of departures, so the list is as long whatever is cancelled. It is
   never the large one, which is always the next departure you can actually take, even when a run of cancellations
   comes before it.
 - **Arrivals:** a sensor that lists arrivals is headed "Arrivals", and one that says it lists departures "Departures".
-  An arrival stays for half an hour after its time, and one that has come in shows when, dimmed and marked as landed or
-  arrived, with its delay and any notice. The latest two that are over, come in or cancelled and past their time, are
+  An arrival stays for half an hour after its time, and one that has come in shows when, dimmed, with its delay. A plane
+  or train that has come in has a green icon, and its popup says it has landed or arrived. The latest two that are over, come in or cancelled and past their time, are
   listed after the large one within the number of departures, so the list is as long whatever has come in. The large
   one is the next arrival still to come.
 - **Which way it goes:** a plane's or a train's large departure or arrival has an icon in front of its destination or
   origin, a plane's takeoff or landing and a train's exit or entry door. In one list of both directions (`combine`),
   every plane and train has it, so the departures and arrivals can be told apart.
-- **Notices:** a notice about the departure itself, such as "Passengers are directed to train S 106", at the end of its
-  line, and the stop's own notices, such as track works with buses replacing trains, each on a line of its own under its
-  name. A notice cut short shows in full when the mouse is over it.
+- **Notices:** a notice about the departure itself, such as "Passengers are directed to train S 106", is in its popup.
+  Its line tells of it with its direction icon in the theme's accent colour, or with an info sign where it has no such
+  icon. The stop's own notices, such as track works with buses replacing trains, are each on a line of its own under
+  its name. One cut short shows in full when the mouse is over it.
 
-<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-light.png#gh-light-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice at the end of its line, and in the rows below the departure it concerns on two lines, the notice beside its time and line">
-<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-dark.png#gh-dark-mode-only" width="510" alt="A bus stop with its own notice under its name, the next departure large with a line notice at the end of its line, and in the rows below the departure it concerns on two lines, the notice beside its time and line">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-light.png#gh-light-mode-only" width="510" alt="A bus stop with its own notice under its name, and an info sign in front of the destination of the next departure and of a later one, which have a notice in their popups">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/stop-with-notices-dark.png#gh-dark-mode-only" width="510" alt="A bus stop with its own notice under its name, and an info sign in front of the destination of the next departure and of a later one, which have a notice in their popups">
 
-<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/airport-light.png#gh-light-mode-only" width="510" alt="An airport's departures and arrivals as one list, each flight with a takeoff or landing icon, the next departure large, two landed flights dimmed with their halls, and a cancelled flight with an outlined badge">
-<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/airport-dark.png#gh-dark-mode-only" width="510" alt="An airport's departures and arrivals as one list, each flight with a takeoff or landing icon, the next departure large, two landed flights dimmed with their halls, and a cancelled flight with an outlined badge">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/airport-light.png#gh-light-mode-only" width="510" alt="An airport's departures and arrivals as one list, each flight with a takeoff or landing icon, the next departure large, two landed flights dimmed with green icons, the departures' gates under the word Gate, and a cancelled flight with an outlined badge">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/airport-dark.png#gh-dark-mode-only" width="510" alt="An airport's departures and arrivals as one list, each flight with a takeoff or landing icon, the next departure large, two landed flights dimmed with green icons, the departures' gates under the word Gate, and a cancelled flight with an outlined badge">
 
 Clicking a stop's name opens its sensor. With `combine` the heading names every stop it shows once, with their direction
 when they all have the same one, and opens the first of them. A stop that can't be shown has a line of its own saying
@@ -122,24 +127,25 @@ why.
 
 ## Sizes
 
-In a sections view the card takes a whole section by default and can be made as narrow as three quarters of one. Two
-stops sit side by side once the card is 620 px wide. With `combine` they are one list at any width. The stop's name
-wraps rather than being cut, unless the card is held to a height without `full_texts`, and so does a line known by a
-long name rather than a number, inside its badge. Times, delays, tracks, platforms and gates are never cut.
+In a sections view the card takes a whole section and can't be made narrower, 320 px at its least. Two stops sit side
+by side once the card is 620 px wide. With `combine` they are one list at any width. The stop's name wraps rather than
+being cut, unless the card is held to a height without `full_texts`, and so does a line known by a long name rather
+than a number, inside its badge. Times, delays, tracks, platforms and gates are never cut.
 
-A departure stays on one line while everything it shows fits there. When it doesn't, the next departure's destination
-goes under its badge and countdown, and a later departure takes two lines. The first has its time and line with any
-word such as Landed or Cancelled, and the second its destination with its delay and track. So a departure's height
-can change with what it shows, and on automatic rows the card can take a row more or less as the departures change.
+A departure is always one line, so the card's height comes from how many departures it shows and never from what they
+say. A destination that doesn't fit is cut short, as are the subtitle and the stop's notices. A text cut short shows in
+full when the mouse is over it, and a departure's popup has its destination in full.
 
-The subtitle, the notices, the next departure's destination and, on a departure split onto two lines, the destination
-and words such as Landed are cut short to keep the card compact, so a later departure is never more than two lines and
-each of the stop's notices one. A text cut short shows in full when the mouse is over it. Set `full_texts: true` to show
-them in full.
+Set `full_texts: true` to show them in full. A destination that doesn't fit beside the rest of its line then takes the
+next line whole, so a departure's height can change with its destination, and on automatic rows the card can take a row
+more or less as the departures change.
+
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/narrow-light.png#gh-light-mode-only" width="330" alt="A bus stop on a card at its narrowest, a whole section of 320 px, with every departure on one line">
+<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/narrow-dark.png#gh-dark-mode-only" width="330" alt="A bus stop on a card at its narrowest, a whole section of 320 px, with every departure on one line">
 
 Held to a height, the card keeps its title, its attribution and each stop's name and subtitle to one line, cut short
 with an ellipsis when they are longer, unless `full_texts` shows them in full. The least it gets keeps every stop's
-next departure and the first departure after it in view, with room for each to be split. It counts the stops one above
+next departure and the first departure after it in view. It counts the stops one above
 the other, unless the card has 24 columns or more in a sections view, which keep it at least 620 px wide wherever its
 section sits beside others, so its stops always sit in pairs side by side there. On a phone, where the section takes the
 screen's width, such a card's stops go one above the other again, and those that don't fit the rows set for it scroll. A stop's notices, texts shown in full,
@@ -147,15 +153,10 @@ the line about a sensor that can't be shown and a long line name wrapping on a c
 a section allows, take room of their own, and the later departures scroll under them.
 
 The card's parts are sized in half rows of a sections view. A stop with four departures takes four rows, and two more
-departures take one more row. A title or a stop's notice takes half a row, as does each departure. A later departure on two
-lines takes a whole row, as does a next departure whose destination goes under its badge, and a stop under another
-leaves half a row. On automatic rows the card ends on a
-whole row, with any half row left over under the title, or at the top without one. With `row_step: half` it ends on the
-half row its parts end on. With `max_height`, it grows the same way up to that height rounded down to its rows, so it
-stays on the rows when it reaches it too.
-
-<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/narrow-light.png#gh-light-mode-only" width="250" alt="A bus stop on a narrow card, the destination under the line and countdown, a later departure with a notice on two lines, its time, line and notice above its destination and delay, and the others on one">
-<img src="https://raw.githubusercontent.com/jesmak/departures-card/main/docs/images/narrow-dark.png#gh-dark-mode-only" width="250" alt="A bus stop on a narrow card, the destination under the line and countdown, a later departure with a notice on two lines, its time, line and notice above its destination and delay, and the others on one">
+departures take one more row. A title or a stop's notice takes half a row, as does each departure, and a stop under
+another leaves half a row. On automatic rows the card ends on a whole row, with any half row left over under the title,
+or at the top without one. With `row_step: half` it ends on the half row its parts end on. With `max_height`, it grows
+the same way up to that height rounded down to its rows, so it stays on the rows when it reaches it too.
 
 In the `fixed` and `max` height modes, or with a number of rows given to the card in a sections view, the title, the
 data's attribution and each stop's name, notices and next departure stay where they are, and only the stop's later
@@ -228,6 +229,16 @@ entities:
   - sensor.helsinki
   - sensor.helsinki_arrivals
 ```
+
+## Upgrading from 1.x
+
+Nothing needs changing in the card's configuration. Three things look different:
+
+- A card set narrower than a whole section in a sections view is widened to one, as the card's least width is now 12
+  columns.
+- A departure's notice, the word for one that has landed or arrived, its timetable time and an arriving plane's hall
+  have moved from its line to its popup.
+- A card held to a height can be given fewer rows than before, as a departure no longer needs room for a second line.
 
 ## Data
 

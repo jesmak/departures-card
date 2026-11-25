@@ -48,14 +48,18 @@ function narrowestWidth(columns: number): number {
     return (columns * (307 + 8)) / 12 - 8;
 }
 
+/** Whether the browser has the Popover API, which a departure's popup needs. */
+function hasPopovers(): boolean {
+    return "showPopover" in HTMLElement.prototype;
+}
+
 /**
- * Whether a line laid out on one line runs past its right side. Read from the parts' own boxes, in fractions of a
- * pixel, as scrollWidth and clientWidth are rounded to whole pixels and miss a line less than half a pixel too wide.
- * The lines have no padding or border at their sides.
+ * Where a departure leaves from, when its line shows it: not for a cancelled one, and not a landing plane's hall,
+ * which matters less than a gate and is in the popup.
  */
-function overflows(line: HTMLElement): boolean {
-    const { right } = line.getBoundingClientRect();
-    return [...line.children].some((part) => part.getBoundingClientRect().right > right + 0.01);
+function shownPlatform(departure: ShownDeparture): string | undefined {
+    const hidden = departure.cancelled || (departure.mode === "plane" && departure.direction === "arrivals");
+    return hidden ? undefined : departure.platform || undefined;
 }
 
 /** The icons that show which way a departure goes, by mode. */
@@ -102,8 +106,14 @@ export class DeparturesCard extends LitElement {
      */
     @state() private spare = 0;
 
-    /** The lines last measured too wide for one line, by their `data-key`, so a render never drops a split. */
-    private splits = new Set<string>();
+    /** The departure whose details are open in the popup, by its key. */
+    @state() private open?: string;
+
+    /** The departures drawn, by their keys, for the popup. */
+    private readonly shown = new Map<string, ShownDeparture>();
+    /** The departure whose popup the click under way has just closed, so the same click doesn't open it again. */
+    private dismissed?: string;
+    private readonly hideDetails = (): void => this.renderRoot.querySelector<HTMLElement>(".details")?.hidePopover();
     private ticker?: ReturnType<typeof setInterval>;
     private readonly resizes = new ResizeObserver(() => this.alignBadgesSoon());
     private frame?: number;
@@ -163,17 +173,16 @@ export class DeparturesCard extends LitElement {
     }
 
     /**
-     * In a sections view the card takes a whole section by default and is never narrower than three quarters of one,
-     * where a line's badge and a departure's time still fit side by side.
+     * In a sections view the card takes a whole section and is never narrower: a departure keeps to one line, and
+     * narrower than a section a flight's number, delay and gate leave its destination no room.
      */
     public getGridOptions(): Record<string, unknown> {
-        return { columns: 12, min_columns: 9, rows: "auto", min_rows: gridMinRows(this.minimumHeight(true)) };
+        return { columns: 12, min_columns: 12, rows: "auto", min_rows: gridMinRows(this.minimumHeight(true)) };
     }
 
     /**
      * Held to a height, the title, the attribution and every stop's heading, which a held card keeps to one line each,
-     * and every stop's next departure and first row after it still fit, with room for each to be split. The minimum is
-     * for the narrowest its columns get, where a departure may not fit on one line, and a split one is never taller.
+     * and every stop's next departure and first row after it still fit, each on its one line.
      * In a sections view, columns that keep the card wide enough for two stops side by side even at their narrowest
      * count the stops in pairs, otherwise they are one above the other. Notices, texts shown in full, the line about a
      * sensor that can't be shown and a long line name wrapping on a card narrower than a section allows come with the
@@ -186,10 +195,10 @@ export class DeparturesCard extends LitElement {
         const borderAndPadding = 34;
         const title = this.config.title ? 32 : 0;
         const attribution = 27;
-        // The heading and the next departure, its destination on a line of its own.
-        const next = 106;
-        // The first row after it, on its two lines.
-        const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 81 : 0;
+        // The heading and the next departure.
+        const next = 74;
+        // The divider and the first row after it.
+        const row = (this.config.departures ?? DEFAULT_DEPARTURES) > 1 ? 49 : 0;
         const stops = this.combines ? 1 : sectionsOf(this.config.entities).length;
         if (stops === 0) {
             return 0;
@@ -226,6 +235,7 @@ export class DeparturesCard extends LitElement {
         clearInterval(this.ticker);
         this.resizes.disconnect();
         cancelAnimationFrame(this.frame ?? 0);
+        window.removeEventListener("scroll", this.hideDetails, true);
     }
 
     protected updated(): void {
@@ -238,67 +248,41 @@ export class DeparturesCard extends LitElement {
             this.resizes.observe(card);
         }
         // At once as well as with the badges, as the render has just written the rows' class attribute afresh.
-        this.splitLines();
+        this.markScrollers();
         this.alignBadgesSoon();
+        // A departure that has left the list takes its popup with it.
+        if (this.open && !this.shown.has(this.open)) {
+            this.hideDetails();
+        }
     }
 
     /**
-     * A departure stays on one line while everything it shows fits there. One that doesn't is split: a later departure
-     * into its two lines, the next departure with its destination under its badge and countdown. Each is measured with
-     * every part on one line and its texts whole, apart from the next departure's own notice, which is cut short anyway.
-     * Measuring never changes a height: each line is held to the height it is drawn at while it is measured, or the card
-     * would change height for a moment, and whatever scrolls around it, the page or its own list, would scroll back up or
-     * gain a scrollbar that makes the lines narrower than drawn.
-     *
-     * Held to a height, a stop whose later departures scroll gives up some of their width to the scrollbar and the room
-     * beside it, and one whose departures fit gives up none. Narrower rows split, and split rows are taller, so rows
-     * measured as they are drawn could keep scrolling only because they already did. Every stop is therefore measured
-     * at its whole width first, and only one that still scrolls is marked and measured again at the width left. A stop
-     * marked can make the next one scroll, as they share the card's height, so that repeats until no more do.
+     * Held to a height, a stop whose later departures scroll gives them a gutter for the scrollbar and room beside it,
+     * and one whose departures fit gives up none. With texts shown in full a narrower row can be a taller one, so rows
+     * judged as they are drawn could keep scrolling only because they already did. Every stop is therefore judged at
+     * its whole width first, and only one that still scrolls is marked. A stop marked can make the next one scroll, as
+     * they share the card's height, so that repeats until no more do.
      */
-    private splitLines(): void {
+    private markScrollers(): void {
         const card = this.renderRoot.querySelector<HTMLElement>("ha-card");
         if (!card?.clientWidth) {
             return;
         }
         const scrollers = card.classList.contains("held") ? [...card.querySelectorAll<HTMLElement>("section > .rows")] : [];
-        // Rows measured at their whole width may be shorter than drawn, which scrolls a list near its end back up.
+        // Rows at their whole width may be shorter than drawn, which scrolls a list near its end back up.
         const scrolled = scrollers.map((rows) => rows.scrollTop);
         card.querySelectorAll(".rows.scrolls").forEach((rows) => rows.classList.remove("scrolls"));
-        this.measureLines(card, [...card.querySelectorAll<HTMLElement>(".next, .row")]);
         for (;;) {
             const scrolling = scrollers.filter((rows) => !rows.classList.contains("scrolls") && rows.scrollHeight > rows.clientHeight);
             if (!scrolling.length) {
                 break;
             }
             scrolling.forEach((rows) => rows.classList.add("scrolls"));
-            this.measureLines(
-                card,
-                scrolling.flatMap((rows) => [...rows.querySelectorAll<HTMLElement>(".row")]),
-            );
         }
         scrollers.forEach((rows, index) => {
             if (rows.scrollTop !== scrolled[index]) {
                 rows.scrollTop = scrolled[index];
             }
-        });
-        this.splits = new Set([...card.querySelectorAll<HTMLElement>(".split")].map((line) => line.dataset.key ?? ""));
-    }
-
-    /** Splits those of the lines that don't fit on one line at the width they have now. */
-    private measureLines(card: HTMLElement, lines: HTMLElement[]): void {
-        // Their layout height, its padding included, not the drawn one, which a dialog opening with a scale shrinks.
-        const heights = lines.map((line) => getComputedStyle(line).height);
-        lines.forEach((line, index) => {
-            line.style.height = heights[index];
-            line.classList.remove("split");
-        });
-        card.toggleAttribute("data-measuring", true);
-        const over = lines.map(overflows);
-        card.toggleAttribute("data-measuring", false);
-        lines.forEach((line, index) => {
-            line.classList.toggle("split", over[index]);
-            line.style.height = "";
         });
     }
 
@@ -313,7 +297,7 @@ export class DeparturesCard extends LitElement {
         cancelAnimationFrame(this.frame ?? 0);
         this.frame = requestAnimationFrame(() => {
             this.alignBadges();
-            this.splitLines();
+            this.markScrollers();
             this.keepNextDepartures();
             this.fillRows();
         });
@@ -445,13 +429,16 @@ export class DeparturesCard extends LitElement {
         // Without a title the stops are centred, so the upper half of the room goes above them.
         const spare = this.config.title ? this.spare : Math.floor(this.spare / 2);
         const style = spare ? [filled, `--departures-spare: ${spare}px`].filter(Boolean).join("; ") : filled;
+        this.shown.clear();
+        const stops = this.combines ? this.combined(sections) : sections.map((section) => this.section(section));
         return html`
             <ha-card class=${classes} style=${style}>
                 ${this.config.title ? html`<h1 class="card-title" title=${this.config.title}>${this.config.title}</h1>` : nothing}
                 ${sections.length === 0 ? html`<div class="message">${this.text("common.no_entities")}</div>` : nothing}
-                <div class="sections">${this.combines ? this.combined(sections) : sections.map((section) => this.section(section))}</div>
+                <div class="sections">${stops}</div>
                 ${attribution ? html`<div class="attribution" title=${attribution}>${attribution}</div>` : nothing}
             </ha-card>
+            ${this.details()}
         `;
     }
 
@@ -544,6 +531,14 @@ export class DeparturesCard extends LitElement {
             this.config?.departures ?? DEFAULT_DEPARTURES,
             this.config?.show_cancelled !== false,
         );
+        // Ids are unique within a sensor only, and two stops on a route list the same trip. The key names the first
+        // sensor shown, so an open popup closes when that sensor drops out.
+        const keyOf = (departure: ShownDeparture) => `${entities[0].entity_id}#${departure.key}`;
+        for (const departure of next ? [next, ...rest] : rest) {
+            this.shown.set(keyOf(departure), departure);
+        }
+        // What the rows' last column is, when they all call it the same: a gate, a track.
+        const labels = new Set(rest.filter(shownPlatform).map((departure) => this.platformLabel(departure)));
         return html`
             <section>
                 ${heading}
@@ -553,18 +548,19 @@ export class DeparturesCard extends LitElement {
                             <ha-icon icon="mdi:alert-outline"></ha-icon><span>${notice}</span>
                         </div>`,
                 )}
-                ${next ? this.next(next) : nothing}
+                ${next ? this.next(next, keyOf(next)) : nothing}
                 ${
                     rest.length
-                        ? html`<div
-                              class="rows ${rest.some((departure) => dayLabel(departure.estimated, Date.now(), this.language(), this.timeZone())) ? "with-days" : ""}"
-                          >
-                              ${repeat(
-                                  rest,
-                                  (departure) => departure.key,
-                                  (departure) => this.row(departure, rowIcons),
-                              )}
-                          </div>`
+                        ? html`<div class="rule">${labels.size === 1 ? html`<span>${[...labels][0]}</span>` : nothing}</div>
+                              <div
+                                  class="rows ${rest.some((departure) => dayLabel(departure.estimated, Date.now(), this.language(), this.timeZone())) ? "with-days" : ""}"
+                              >
+                                  ${repeat(
+                                      rest,
+                                      (departure) => departure.key,
+                                      (departure) => this.row(departure, keyOf(departure), rowIcons),
+                                  )}
+                              </div>`
                         : nothing
                 }
                 ${
@@ -576,96 +572,209 @@ export class DeparturesCard extends LitElement {
         `;
     }
 
-    /** The next departure: what, where to, and how soon, with the live time, delay and platform under it. */
-    private next(departure: ShownDeparture): TemplateResult {
+    /**
+     * The next departure: what, where to, and how soon, with its delay and gate under its destination. The rest is in
+     * its popup, as a later departure's is.
+     */
+    private next(departure: ShownDeparture, key: string): TemplateResult {
         const minutes = minutesUntil(departure.estimated, Date.now());
-        const delay = delayMinutes(departure);
         const countdown =
             minutes === null
                 ? this.when(departure.estimated)
                 : minutes < 1
                   ? this.text("common.now")
                   : html`${minutes}<span class="unit"> ${this.text("common.min")}</span>`;
+        // The countdown comes first, as with texts shown in full it floats at the end of the first line.
         return html`
-            <div class="next ${this.splits.has(`next:${departure.key}`) ? "split" : ""}" data-key="next:${departure.key}">
+            <button class="next" @click=${(event: Event) => this.showDetails(key, event.currentTarget as HTMLElement)}>
+                <span class="countdown">${countdown}</span>
                 ${this.badge(departure, "large")}
-                <div class="next-text">
-                    <div class="headsign" title=${departure.headsign ?? nothing}>
-                        ${this.directionIcon(departure)}${departure.headsign ?? ""}
-                    </div>
-                    <div class="meta">
-                        ${this.live(departure)}
-                        ${delay !== 0 ? html`<span class="struck">${this.when(departure.scheduled)}</span>` : nothing}
-                        ${minutes !== null ? html`<span>${this.when(departure.estimated)}</span>` : nothing} ${this.delay(delay)}
-                        ${this.platform(departure)}
-                        ${departure.notice ? html`<span class="notice" title="${departure.notice}">${departure.notice}</span>` : nothing}
-                    </div>
-                </div>
-                <div class="countdown">${countdown}</div>
-            </div>
+                <span class="next-text">
+                    <span class="headsign" title=${departure.headsign ?? nothing}>${this.destination(departure, true)}</span>
+                    <span class="meta">${this.live(departure)}${this.end(departure, true)}</span>
+                </span>
+            </button>
         `;
     }
 
     /**
-     * A later departure on one line: its time, line and destination, and whatever is out of the ordinary. One that has
-     * come in shows when, dimmed, and says so in its own words, as its source leaves that to the card, with its delay and
-     * any other notice.
+     * A later departure on one line: its time, line and destination, and at its end how late it is and where it
+     * leaves from. One that has come in is dimmed. Whatever else it says is in its popup, which its icon tells of.
      */
-    private row(departure: ShownDeparture, icon: boolean): TemplateResult {
+    private row(departure: ShownDeparture, key: string, icon: boolean): TemplateResult {
         const cancelled = !!departure.cancelled;
         const arrived = !cancelled && !!departure.arrived;
-        const delay = delayMinutes(departure);
-        // The words, apart from the numbers, so a split row can put them on the first line and the numbers on the second.
-        let info: TemplateResult;
-        if (cancelled) {
-            const text = [this.text("common.cancelled"), departure.notice].filter(Boolean).join(", ");
-            info = html`<span class="status" title="${text}"><span class="alert">${text}</span></span>`;
-        } else {
-            const landed = arrived ? this.text(departure.mode === "plane" ? "common.landed" : "common.arrived") : "";
-            const text = [landed, departure.notice].filter(Boolean).join(", ");
-            info = html`${this.delay(delay)}
-            ${
-                text
-                    ? html`<span class="status" title="${text}"
-                          >${landed ? html`<span class="arrived">${landed}</span>` : nothing}
-                          ${departure.notice ? html`<span class="alert">${departure.notice}</span>` : nothing}</span
-                      >`
-                    : nothing
-            }
-            ${this.platform(departure)}`;
-        }
-        const key = `row:${departure.key}`;
+        // The end comes first, as with texts shown in full it floats at the end of the first line.
         return html`
-            <div
-                class="row ${cancelled ? "cancelled" : ""} ${arrived ? "came-in" : ""} ${this.splits.has(key) ? "split" : ""}"
-                data-key=${key}
+            <button
+                class="row ${cancelled ? "cancelled" : ""} ${arrived ? "came-in" : ""}"
+                @click=${(event: Event) => this.showDetails(key, event.currentTarget as HTMLElement)}
             >
+                ${this.end(departure)}
                 <span class="time ${cancelled ? "struck" : ""}">${this.when(cancelled ? departure.scheduled : departure.estimated)}</span>
                 ${this.badge(departure, "small")}
-                <span class="headsign" title="${departure.headsign ?? ""}"
-                    >${icon ? this.directionIcon(departure) : nothing}${departure.headsign ?? ""}</span
-                >
-                <span class="info">${info}</span>
-            </div>
+                <span class="headsign" title=${departure.headsign ?? nothing}>${this.destination(departure, icon)}</span>
+            </button>
         `;
+    }
+
+    /**
+     * What ends a departure's line: that it is cancelled, or its delay and its gate or track, the numbers without their
+     * words. The large departure also says that it is on time, where a row has only its live icon's place to say it in.
+     */
+    private end(departure: ShownDeparture, large = false): TemplateResult | typeof nothing {
+        if (departure.cancelled) {
+            return html`<span class="end"><span class="alert">${this.text("common.cancelled")}</span></span>`;
+        }
+        const minutes = delayMinutes(departure);
+        const delay =
+            large && departure.realtime && minutes === 0
+                ? html`<span class="on-time">${this.text("common.on_time")}</span>`
+                : this.delay(minutes);
+        const platform = shownPlatform(departure);
+        if (delay === nothing && !platform) {
+            return nothing;
+        }
+        return html`<span class="end"
+            >${delay}${delay !== nothing && platform ? html`<span class="separator">·</span>` : nothing}${
+                platform ? html`<span class="platform">${platform}</span>` : nothing
+            }</span
+        >`;
+    }
+
+    /** A destination with its icon, which stays with its first word when the text wraps. */
+    private destination(departure: ShownDeparture, direction: boolean): TemplateResult {
+        const [first, ...rest] = (departure.headsign ?? "").split(" ");
+        return html`<span class="first">${this.statusIcon(departure, direction)}${first}</span>${rest.length ? ` ${rest.join(" ")}` : ""}`;
     }
 
     /**
      * Which way a plane or a train goes, in front of its destination or origin: a plane takes off or lands, a train
      * leaves or comes in by a door, as no icon shows a train arriving. Buses and the rest have no direction to show.
+     * The icon also tells of what is in the popup: in the accent colour for a departure with a notice, in green for one
+     * that has come in. A departure with a notice and no direction icon gets an info sign instead.
      */
-    private directionIcon(departure: ShownDeparture): TemplateResult | typeof nothing {
+    private statusIcon(departure: ShownDeparture, direction: boolean): TemplateResult | typeof nothing {
         const icons = DIRECTION_ICONS[departure.mode];
-        if (!icons) {
+        const tone = departure.cancelled ? "" : departure.notice ? "noted" : departure.arrived ? "landed" : "";
+        if (icons && direction) {
+            const arriving = departure.direction === "arrivals";
+            return html`<ha-icon
+                class="direction ${tone}"
+                icon=${arriving ? icons.arriving : icons.departing}
+                title=${this.text(arriving ? "common.arriving" : "common.departing")}
+            ></ha-icon>`;
+        }
+        return tone === "noted"
+            ? html`<ha-icon class="direction noted" icon="mdi:information-outline" title=${departure.notice ?? ""}></ha-icon>`
+            : nothing;
+    }
+
+    /** Everything about a departure, in the popup its line opens: what it says in words, its times and where it leaves from. */
+    private details(): TemplateResult | typeof nothing {
+        if (!hasPopovers()) {
             return nothing;
         }
-        const arriving = departure.direction === "arrivals";
-        return html`<ha-icon
-            class="direction"
-            icon=${arriving ? icons.arriving : icons.departing}
-            title=${this.text(arriving ? "common.arriving" : "common.departing")}
-        ></ha-icon>`;
+        const departure = this.open ? this.shown.get(this.open) : undefined;
+        return html`<div class="details" popover="auto" @beforetoggle=${this.detailsToggled}>
+            ${departure ? this.detailsOf(departure) : nothing}
+        </div>`;
     }
+
+    private detailsOf(departure: ShownDeparture): TemplateResult {
+        const cancelled = !!departure.cancelled;
+        const landed = !cancelled && !!departure.arrived;
+        const words: TemplateResult[] = [];
+        if (cancelled) {
+            words.push(html`<span class="alert">${this.text("common.cancelled")}</span>`);
+        }
+        if (landed) {
+            words.push(html`<span class="arrived">${this.text(departure.mode === "plane" ? "common.landed" : "common.arrived")}</span>`);
+        }
+        if (departure.notice) {
+            words.push(html`<span class=${cancelled ? "alert" : "noted"}>${departure.notice}</span>`);
+        }
+        return html`
+            <div class="details-title">
+                ${this.badge(departure, "small")} <span class="headsign">${this.destination(departure, true)}</span>
+                <button class="close" title=${this.text("common.close")} aria-label=${this.text("common.close")} @click=${this.hideDetails}>
+                    <ha-icon icon="mdi:close"></ha-icon>
+                </button>
+            </div>
+            <dl>
+                ${
+                    words.length
+                        ? html`<dt>${this.text("common.status")}</dt>
+                              <dd>${words.map((word, index) => html`${index ? ", " : nothing}${word}`)}</dd>`
+                        : nothing
+                }
+                <dt>${this.text("common.scheduled")}</dt>
+                <dd>${this.when(departure.scheduled)}</dd>
+                ${
+                    !cancelled && departure.realtime
+                        ? html`<dt>${this.text("common.estimated")}</dt>
+                              <dd>${this.live(departure)} ${this.when(departure.estimated)} ${this.delay(delayMinutes(departure))}</dd>`
+                        : nothing
+                }
+                ${
+                    !cancelled && departure.platform
+                        ? html`<dt>${this.platformLabel(departure)}</dt>
+                              <dd>${departure.platform}</dd>`
+                        : nothing
+                }
+            </dl>
+        `;
+    }
+
+    /**
+     * Opens a departure's popup under its line, or over it when there is no room under. It is in the top layer, so a
+     * card held to a height doesn't clip it and nothing in the card moves. Without the Popover API there is no popup.
+     */
+    private async showDetails(key: string, line: HTMLElement): Promise<void> {
+        if (!hasPopovers() || this.dismissed === key) {
+            return;
+        }
+        // From the keyboard nothing has closed the popup before the click, as a pointer does.
+        if (this.open === key) {
+            this.hideDetails();
+            return;
+        }
+        const showing = this.open !== undefined;
+        this.open = key;
+        await this.updateComplete;
+        const popup = this.renderRoot.querySelector<HTMLElement>(".details");
+        const card = this.renderRoot.querySelector<HTMLElement>("ha-card");
+        if (!popup || !card) {
+            return;
+        }
+        if (!showing) {
+            popup.showPopover();
+        }
+        const margin = 8;
+        const at = line.getBoundingClientRect();
+        const width = Math.min(card.getBoundingClientRect().width - 32, 360);
+        popup.style.width = `${width}px`;
+        popup.style.left = `${Math.max(margin, Math.min(at.left, window.innerWidth - width - margin))}px`;
+        const height = popup.offsetHeight;
+        const under = at.bottom + 4;
+        popup.style.top = `${under + height > window.innerHeight - margin ? Math.max(margin, at.top - height - 4) : under}px`;
+        // It stays where it was opened, so it closes when anything scrolls from under it.
+        window.addEventListener("scroll", this.hideDetails, { capture: true, passive: true });
+    }
+
+    /**
+     * A click outside closes the popup before the click itself arrives. One on the popup's own line would open it
+     * again, so that line is remembered until the click is over.
+     */
+    private readonly detailsToggled = (event: Event): void => {
+        if ((event as ToggleEvent).newState !== "closed") {
+            return;
+        }
+        window.removeEventListener("scroll", this.hideDetails, true);
+        this.dismissed = this.open;
+        this.open = undefined;
+        setTimeout(() => (this.dismissed = undefined));
+    };
 
     /** A cancelled departure's badge is an outline in the theme's own text colour, which every theme makes readable. */
     private badge(departure: Departure, size: "large" | "small"): TemplateResult {
@@ -703,18 +812,14 @@ export class DeparturesCard extends LitElement {
     }
 
     /** A train leaves from a track, a plane from a gate and lands into a hall, a ship from a berth, everything else from a platform. */
-    private platform(departure: ShownDeparture): TemplateResult | typeof nothing {
-        if (!departure.platform) {
-            return nothing;
-        }
+    private platformLabel(departure: ShownDeparture): string {
         const labels: Record<string, string> = {
             train: "common.track",
             plane: departure.direction === "arrivals" ? "common.hall" : "common.gate",
             ferry: "common.berth",
             ship: "common.berth",
         };
-        const label = this.text(labels[departure.mode] ?? "common.platform");
-        return html`<span class="platform">${label} ${departure.platform}</span>`;
+        return this.text(labels[departure.mode] ?? "common.platform");
     }
 
     /** A clock time, with its day in front when it isn't today: "ma 06.15". */
@@ -835,9 +940,7 @@ export class DeparturesCard extends LitElement {
 
                 .subtitle,
                 .message,
-                .meta,
-                .attribution,
-                .platform {
+                .attribution {
                     color: var(--secondary-text-color);
                 }
 
@@ -859,11 +962,65 @@ export class DeparturesCard extends LitElement {
                     padding: 8px 0 4px;
                 }
 
+                /* A departure's line is a button that opens its popup. */
+                .next,
+                .row {
+                    width: 100%;
+                    border: none;
+                    background: none;
+                    color: inherit;
+                    font: inherit;
+                    text-align: start;
+                    cursor: pointer;
+                }
+
+                /* Under the pointer a line is lit with the same 4 px around its text on every side, so the light reaches into
+                   the card's padding at the sides, and stops 2 px short of the row above and below, clear of the divider's
+                   label. Keyboard focus rings the same shape. */
+                .next,
+                .row {
+                    position: relative;
+                    isolation: isolate;
+                }
+
+                :is(.next, .row)::before {
+                    content: "";
+                    position: absolute;
+                    z-index: -1;
+                    inset: 2px -4px;
+                    border-radius: 8px;
+                }
+
+                .next::before {
+                    inset: -4px;
+                }
+
+                @media (hover: hover) {
+                    :is(.next, .row):hover::before {
+                        background: color-mix(in srgb, var(--primary-text-color) 6%, transparent);
+                    }
+                }
+
+                :is(.next, .row):focus-visible {
+                    outline: none;
+                }
+
+                :is(.next, .row):focus-visible::before {
+                    outline: 2px solid var(--primary-color);
+                }
+
+                /* The next departure is always 44 px: its destination is cut short rather than moved to a line of its own, so
+                   the card's height never comes from what a departure says. */
                 .next {
                     display: flex;
                     align-items: center;
                     gap: 14px;
                     margin-top: 10px;
+                    padding: 0;
+                }
+
+                .next .countdown {
+                    order: 1;
                 }
 
                 .next-text {
@@ -872,65 +1029,92 @@ export class DeparturesCard extends LitElement {
                 }
 
                 .next .headsign {
+                    display: block;
                     font-size: 20px;
                     font-weight: var(--ha-font-weight-medium, 500);
                     line-height: 26px;
                 }
 
-                /* The large destination keeps to one line, so the next departure is always as tall, unless texts are shown in full. */
-                ha-card:not(.full) .next .headsign {
+                ha-card:not(.full) :is(.next, .row) .headsign {
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
                 }
 
-                .headsign {
-                    overflow-wrap: anywhere;
+                .first {
+                    white-space: nowrap;
                 }
 
-                /* Split, the large departure's destination takes a line of its own, under the badge and countdown, which
-                   together take 32 px more than one line. */
-                .next.split {
-                    flex-wrap: wrap;
-                    row-gap: 0;
-                }
-
-                .next.split .next-text {
-                    order: 3;
-                    flex-basis: 100%;
-                }
-
-                .next.split .badge.large {
-                    padding-block: 4px;
-                    line-height: 24px;
-                }
-
-                .next.split .countdown {
-                    margin-inline-start: auto;
-                    line-height: 32px;
-                }
-
-                /* The departure's own notice ends the line and is cut short, so its details always take one line. */
+                /* As tall with nothing to say, so the large departure's height doesn't follow its data. */
                 .meta {
                     display: flex;
                     align-items: center;
-                    gap: 4px 6px;
+                    gap: 6px;
+                    min-height: 18px;
+                    line-height: 18px;
+                }
+
+                /* A line's end: how late it is and where it leaves from, never cut. Its own line height, so its two sizes of
+                   text on one baseline are no taller than the line they end. */
+                .end {
+                    flex: none;
+                    display: flex;
+                    align-items: baseline;
+                    gap: 5px;
+                    font-size: 12px;
+                    line-height: 16px;
+                    white-space: nowrap;
+                }
+
+                .meta .end {
                     font-size: 13px;
                     line-height: 18px;
                 }
 
-                .meta .notice {
-                    flex: 1 1 0;
-                    min-width: 0;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
+                .end .platform {
+                    font-size: 13px;
+                    font-weight: var(--ha-font-weight-medium, 500);
                 }
 
-                .full .meta .notice {
-                    flex-basis: auto;
-                    white-space: normal;
-                    overflow-wrap: anywhere;
+                .separator {
+                    color: var(--secondary-text-color);
+                }
+
+                /*
+                 * With texts shown in full, a destination that doesn't fit beside the rest of its line takes the next line
+                 * whole, and wraps only when it is longer than that. Nothing is measured: the line's end floats at the right
+                 * of the first line and the destination is a block in the text's flow, so it goes under by itself when the
+                 * first line has no room for it.
+                 */
+                .full .next {
+                    display: flow-root;
+                    line-height: 44px;
+                }
+
+                .full .next > * {
+                    line-height: normal;
+                }
+
+                .full .next .countdown {
+                    float: inline-end;
+                    margin-inline-start: 14px;
+                    line-height: 44px;
+                }
+
+                .full .next .badge.large {
+                    display: inline-block;
+                    margin-inline-end: 14px;
+                    vertical-align: middle;
+                }
+
+                .full .next-text {
+                    display: inline-block;
+                    max-width: 100%;
+                    vertical-align: middle;
+                }
+
+                .full :is(.next, .row) .headsign {
+                    overflow-wrap: break-word;
                 }
 
                 .countdown {
@@ -1012,23 +1196,45 @@ export class DeparturesCard extends LitElement {
                     min-width: var(--badge-width, min-content);
                 }
 
-                .rows {
+                /* The divider over the later departures stops short of the card's edge when their last column has a name,
+                   such as Gate or Track, which ends its line. */
+                .rule {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    height: 1px;
                     margin-top: 12px;
-                    padding-top: 4px;
-                    border-top: 1px solid var(--divider-color);
+                    font-size: 11px;
+                    line-height: 1;
+                    color: var(--secondary-text-color);
                 }
 
-                /* A row on one line, with its destination taking the room left. One that doesn't fit is split, below. Its height
-                   includes its padding, as splitLines holds it to the height it is drawn at while it measures, and taking
-                   the split off to measure it takes its padding from 10 px to 6. */
+                .rule::before {
+                    content: "";
+                    flex: 1;
+                    height: 1px;
+                    background: var(--divider-color);
+                }
+
+                .rows {
+                    padding-top: 4px;
+                }
+
+                /* A later departure is always one line, 32 px, with its destination taking the room left and cut short when
+                   it is longer. */
                 .row {
                     box-sizing: border-box;
                     display: flex;
                     align-items: center;
-                    gap: 2px 10px;
+                    gap: 10px;
+                    min-height: 32px;
                     padding: 6px 0;
                     font-size: 14px;
                     line-height: 20px;
+                }
+
+                .row .end {
+                    order: 1;
                 }
 
                 .time {
@@ -1056,138 +1262,110 @@ export class DeparturesCard extends LitElement {
                     min-width: 0;
                 }
 
-                .info {
-                    flex: 0 1 auto;
-                    min-width: 0;
-                    margin-inline-start: auto;
+                .full .row {
+                    display: flow-root;
+                }
+
+                .full .row .end {
+                    float: inline-end;
+                    margin-inline-start: 10px;
+                    height: 20px;
+                    align-items: center;
+                }
+
+                .full .row :is(.time, .badge) {
+                    display: inline-block;
+                    margin-inline-end: 10px;
+                    vertical-align: top;
+                }
+
+                .full .row .headsign {
+                    display: inline-block;
+                    max-width: 100%;
+                    vertical-align: top;
+                }
+
+                /* A departure's popup, in the top layer over the page, placed by showDetails. */
+                .details {
+                    box-sizing: border-box;
+                    inset: auto;
+                    margin: 0;
+                    padding: 12px 14px;
+                    border: 1px solid var(--divider-color);
+                    border-radius: 12px;
+                    /* The card's colour over the page's, as a theme's card may be see-through and the popup lies over rows. */
+                    background:
+                        linear-gradient(var(--ha-card-background, var(--card-background-color, #fff)) 0 0),
+                        var(--primary-background-color, #fff);
+                    color: var(--primary-text-color);
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+                    font-size: 13px;
+                    line-height: 20px;
+                    font-variant-numeric: tabular-nums;
+                }
+
+                .details-title {
                     display: flex;
-                    flex-wrap: wrap;
-                    justify-content: flex-end;
-                    align-items: center;
-                    gap: 2px 6px;
-                    font-size: 12px;
+                    align-items: flex-start;
+                    gap: 8px;
+                    margin-bottom: 6px;
+                    font-size: 15px;
+                    font-weight: var(--ha-font-weight-medium, 500);
                 }
 
-                /* What a row says in words: that it has come in, or its notice. Cut short, with the whole in its tooltip. */
-                .status {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 2px 6px;
+                .details-title .headsign {
+                    flex: 1;
                     min-width: 0;
+                    overflow-wrap: break-word;
                 }
 
-                .full .status {
-                    flex-wrap: wrap;
+                .close {
+                    --mdc-icon-size: 18px;
+                    display: flex;
+                    margin: -4px -6px 0 0;
+                    padding: 4px;
+                    border: 0;
+                    border-radius: 50%;
+                    background: none;
+                    color: var(--secondary-text-color);
+                    cursor: pointer;
                 }
 
-                /*
-                 * A later departure that doesn't fit on one line takes two, 64 px: its time, line and what it says in words on
-                 * the first, and its destination with its delay and track under them. The words and the destination are cut
-                 * short, as the numbers never are, unless full_texts asks for them whole and lets them wrap, so a split row is
-                 * never more than two lines. The info box gives up its parts to the row, and an empty item as wide as the row
-                 * breaks it into its two lines, each with the row's whole width.
-                 */
-                .row.split {
-                    flex-wrap: wrap;
-                    gap: 0 6px;
-                    padding: 10px 0;
+                .close:hover,
+                .close:focus-visible {
+                    background: color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+                    color: var(--primary-text-color);
+                    outline: none;
                 }
 
-                .row.split::after {
-                    content: "";
-                    order: 4;
-                    flex-basis: 100%;
+                .details dl {
+                    display: grid;
+                    grid-template-columns: auto minmax(0, 1fr);
+                    gap: 0 12px;
+                    margin: 0;
                 }
 
-                .row.split .info {
-                    display: contents;
+                .details dt {
+                    color: var(--secondary-text-color);
                 }
 
-                .row.split .time {
-                    order: 1;
-                    margin-inline-end: 4px;
+                .details dd {
+                    margin: 0;
+                    overflow-wrap: break-word;
                 }
 
-                .row.split .badge {
-                    order: 2;
-                    margin-inline-end: 4px;
+                .details .live {
+                    vertical-align: -2px;
                 }
 
-                .row.split .status {
-                    order: 3;
-                    flex: 1 1 0;
-                    justify-content: flex-end;
-                }
-
-                .row.split .status .alert,
-                .row.split .status .arrived {
-                    min-width: 0;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
-
-                .row.split .headsign {
-                    order: 5;
-                    flex: 1 1 0;
-                    margin-top: 4px;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
-
-                .row.split :is(.late, .early) {
-                    order: 6;
-                    margin-top: 4px;
-                }
-
-                .row.split .platform {
-                    order: 7;
-                    margin-top: 4px;
-                }
-
-                .full .row.split .headsign,
-                .full .row.split .status .alert,
-                .full .row.split .status .arrived {
-                    white-space: normal;
-                    overflow-wrap: anywhere;
-                }
-
-                /* Measured for splitLines: every part on one line at its whole width, so a line that can't hold them overflows.
-                   A badge keeps its own width, as a long line name wraps inside it however wide the card. */
-                ha-card[data-measuring] :is(.next, .row) {
-                    flex-wrap: nowrap;
-                }
-
-                ha-card[data-measuring] :is(.next, .row) > * {
-                    flex: none;
-                }
-
-                ha-card[data-measuring] :is(.next, .row) :not(.badge, .badge *) {
-                    white-space: nowrap;
-                }
-
-                /* A row on one line keeps it, and only its destination gives way, cut short, should a measure ever be a
-                   hair out. */
-                .row:not(.split) .info {
-                    flex: none;
-                }
-
-                ha-card:not(.full) .row:not(.split) .headsign {
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
-
-                ha-card[data-measuring] .meta .notice {
-                    display: none;
-                }
-
-                /* Numbers stay whole: a track cut short is another track. */
-                .platform,
                 .late,
-                .early {
+                .early,
+                .on-time {
                     white-space: nowrap;
+                }
+
+                .on-time {
+                    color: var(--success-color, #2e7d32);
                 }
 
                 .row.cancelled .headsign,
@@ -1225,6 +1403,20 @@ export class DeparturesCard extends LitElement {
                     color: var(--secondary-text-color);
                 }
 
+                /* A departure with a notice in its popup, and one that has come in. */
+                .direction.noted,
+                .noted {
+                    color: var(--primary-color);
+                }
+
+                .noted {
+                    font-weight: var(--ha-font-weight-medium, 500);
+                }
+
+                .direction.landed {
+                    color: var(--success-color, #2e7d32);
+                }
+
                 .next .direction {
                     --mdc-icon-size: 21px;
                     width: 21px;
@@ -1253,14 +1445,9 @@ export class DeparturesCard extends LitElement {
                     font-weight: var(--ha-font-weight-medium, 500);
                 }
 
-                .alert,
-                .notice {
+                .alert {
                     color: var(--error-color, #c62828);
                     font-weight: var(--ha-font-weight-medium, 500);
-                }
-
-                .notice {
-                    font-size: 13px;
                 }
 
                 /* A notice for the whole stop, such as track works, takes one line, 32 px with its margin, cut short unless
@@ -1302,19 +1489,6 @@ export class DeparturesCard extends LitElement {
                     color: var(--warning-color, #b45309);
                 }
 
-                /* A row's notice is a secondary text, cut short unless full_texts asks for it whole. */
-                .info .alert {
-                    min-width: 0;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
-
-                .full .info .alert {
-                    white-space: normal;
-                    overflow-wrap: anywhere;
-                }
-
                 .attribution {
                     margin-top: 12px;
                     font-size: 11px;
@@ -1347,10 +1521,11 @@ export class DeparturesCard extends LitElement {
                     text-overflow: ellipsis;
                 }
 
+                /* The stops are clipped by height only, as a lit line reaches past their sides. */
                 .held .sections {
                     flex: 1 1 auto;
                     min-height: 0;
-                    overflow: hidden;
+                    overflow-y: clip;
                     align-content: start;
                 }
 
@@ -1367,7 +1542,7 @@ export class DeparturesCard extends LitElement {
                     display: flex;
                     flex-direction: column;
                     min-height: 0;
-                    overflow: hidden;
+                    overflow-y: clip;
                 }
 
                 /* A stop without later departures has nothing to scroll and keeps its height. */
@@ -1376,7 +1551,7 @@ export class DeparturesCard extends LitElement {
                     overflow: visible;
                 }
 
-                /* Nothing in a stop shrinks, which also keeps the next departure at the height splitLines holds it to. */
+                /* Nothing in a stop shrinks. */
                 .held section > * {
                     flex: none;
                 }
@@ -1403,9 +1578,10 @@ export class DeparturesCard extends LitElement {
                     outline-offset: -2px;
                 }
 
-                /* The top fade starts under the rows' own top border, so it doesn't erase it. */
+                /* A scroller clips at its sides too, so it is 4 px wider each way, for a lit line. */
                 .held section > .rows {
-                    --fade-top-offset: 1px;
+                    margin-inline: -4px;
+                    padding-inline: 4px;
                     position: relative;
                     flex: 1 1 auto;
                     min-height: 0;
@@ -1414,16 +1590,10 @@ export class DeparturesCard extends LitElement {
                 }
 
                 /* Room between the rows and the scrollbar, and the scrollbar's gutter, only for a stop whose rows scroll, which
-                   splitLines marks. The gutter is kept, so the rows stay as wide as they were measured. */
+                   markScrollers marks. */
                 .held section > .rows.scrolls {
                     padding-inline-end: 8px;
                     scrollbar-gutter: stable;
-                }
-
-                /* Measured at their whole width, rows still drawn split may scroll, and their scrollbar would take its
-                   width from them just the same. */
-                ha-card[data-measuring] section > .rows:not(.scrolls) {
-                    overflow-y: hidden;
                 }
             `,
             fadeStyles,

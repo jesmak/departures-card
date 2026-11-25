@@ -91,9 +91,17 @@ as names, headsigns and notices, comes from the source in its own words.
 
 Less than a minute away is "now", less than an hour is minutes, and anything later is the clock time. A departure
 whose `estimated` time is more than a minute in the past is hidden, so a sensor that updates every minute doesn't
-show a bus that has already gone. Cancelled departures stay in the list unless the card is set to hide them. The stop's `notices` are shown under its
-name, and a departure's `notice` at the end of its line. Each is cut short to one line, with the full text on hover,
-unless the card is set to show texts in full.
+show a bus that has already gone. Cancelled departures stay in the list unless the card is set to hide them. The stop's
+`notices` are shown under its name, each cut short to one line, with the full text on hover, unless the card is set to
+show texts in full.
+
+### How the card shows the rest
+
+A departure's line has room for little, so the card puts on it only how late or early the departure is and its
+`platform`, as the bare value, and names the platform once above the list. A landing plane's `platform`, its baggage
+hall, is left off its line. Everything else is in the popup that opens when the line is clicked. It has the departure's
+`notice` in full, its `scheduled` and `estimated` times, its `platform` with its name, and that it is cancelled or has
+come in. A departure with a `notice` is marked on its line, so the notice is worth giving only when it says something.
 
 ## Arrivals
 
@@ -103,7 +111,7 @@ hall. A sensor that lists both directions is two sensors, one each, so no other 
 
 The card shows an arrival until half an hour past its `estimated` time, rather than the minute it gives a departure, so
 someone meeting it still sees it after it has come in. One with `arrived: true` shows when it came in, dimmed, with its
-delay and notice, and the card says it has arrived in its own words. A cancelled arrival stays as long. The card's count
+delay, and the card says in its popup that it has arrived, in its own words. A cancelled arrival stays as long. The card's count
 covers every arrival it lists. That is the large one, which is the next arrival still to come that isn't cancelled,
 the cancelled ones, and up to the latest two that are over, come in or cancelled and past their time. The card
 names a sensor's direction under its name when the sensor says one, and shows a plane's or a train's direction as an

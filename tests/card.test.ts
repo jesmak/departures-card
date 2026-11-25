@@ -5,6 +5,7 @@ import type { DeparturesCard } from "../src/departures-card";
 import { compactSections, configFromForm, formData } from "../src/editor";
 import type { HomeAssistant } from "../src/hass";
 import { browserLanguage, translate } from "../src/localize/localize";
+import { popovers } from "./popover";
 import type { Departure, DeparturesCardConfig } from "../src/types";
 
 const NOW = Date.parse("2026-10-04T13:52:00Z");
@@ -79,7 +80,7 @@ describe("departures-card", () => {
         const root = element.shadowRoot!;
         expect(text(root.querySelector(".heading"))).toBe("Kauppatori");
         expect(text(root.querySelector(".next .countdown"))).toBe("11 min");
-        expect(text(root.querySelector(".next .meta"))).toBe("17.01 17.03 +2 min Laituri 3");
+        expect(text(root.querySelector(".next .meta"))).toBe("+2 min·3");
         expect(text(root.querySelector(".row"))).toBe("17.18 16 Kalasatama (M)");
         expect(text(root.querySelector(".attribution"))).toBe("Digitransit, CC BY 4.0");
     });
@@ -294,24 +295,39 @@ describe("departures-card", () => {
     });
 
     it.each([
-        ["train", "fi", "Raide 3"],
-        ["plane", "fi", "Portti 3"],
-        ["bus", "fi", "Laituri 3"],
-        ["funicular", "fi", "Laituri 3"],
-        ["train", "en", "Track 3"],
-        ["plane", "en", "Gate 3"],
-        ["bus", "en", "Platform 3"],
-        ["ship", "en", "Berth 3"],
-        ["ferry", "en", "Berth 3"],
-        ["ship", "fi", "Laituri 3"],
-    ])("names a %s's platform in %s, on the next departure and the rows alike", async (mode, language, label) => {
+        ["train", "fi", "Raide"],
+        ["plane", "fi", "Portti"],
+        ["bus", "fi", "Laituri"],
+        ["funicular", "fi", "Laituri"],
+        ["train", "en", "Track"],
+        ["plane", "en", "Gate"],
+        ["bus", "en", "Platform"],
+        ["ship", "en", "Berth"],
+        ["ferry", "en", "Berth"],
+        ["ship", "fi", "Laituri"],
+    ])("shows a %s's platform as its number, named in %s at the end of the rows' divider", async (mode, language, label) => {
         const state = hass({
             "sensor.kauppatori": [departure("a", 11, { mode, platform: "3" }), departure("b", 26, { mode, platform: "3" })],
         });
         state.locale = { ...state.locale!, language };
         const root = (await card(state, {})).shadowRoot!;
-        expect(text(root.querySelector(".next .platform"))).toBe(label);
-        expect(text(root.querySelector(".row .platform"))).toBe(label);
+        expect(text(root.querySelector(".next .platform"))).toBe("3");
+        expect(text(root.querySelector(".row .platform"))).toBe("3");
+        expect(text(root.querySelector(".rule"))).toBe(label);
+    });
+
+    it("names the rows' last column only when they have one, and all call it the same", async () => {
+        const rule = async (rows: Departure[]) =>
+            text((await card(hass({ "sensor.kauppatori": [departure("a", 5), ...rows] }), {})).shadowRoot!.querySelector(".rule"));
+        expect(await rule([departure("b", 9)])).toBe("");
+        expect(await rule([departure("b", 9, { mode: "train", platform: "1" }), departure("c", 12, { platform: "7" })])).toBe("");
+        // A landing plane's hall isn't on its row, and neither is a cancelled departure's platform.
+        const hall = hass({ "sensor.kauppatori": [departure("a", 5), departure("b", 9, { mode: "plane", platform: "2B" })] });
+        hall.states["sensor.kauppatori"]!.attributes.direction = "arrivals";
+        const landing = (await card(hall, {})).shadowRoot!;
+        expect(text(landing.querySelector(".rule"))).toBe("");
+        expect(landing.querySelector(".row .platform")).toBeNull();
+        expect(await rule([departure("b", 9, { platform: "7", cancelled: true })])).toBe("");
     });
 
     it("says now under a minute, and the clock an hour or more away", async () => {
@@ -342,10 +358,15 @@ describe("departures-card", () => {
         expect(icons).toEqual(["mdi:bus", "mdi:ferry", "mdi:transit-connection-variant", "mdi:ship-wheel"]);
     });
 
-    it("strikes a cancelled departure through with its reason, or hides it", async () => {
+    it("strikes a cancelled departure through, with its reason in its popup, or hides it", async () => {
         const list = [departure("a", 5), departure("x", 9, { mode: "train", line: "S 172", cancelled: true, notice: "Kalusto" })];
         const shown = await card(hass({ "sensor.kauppatori": list }), {});
-        expect(text(shown.shadowRoot!.querySelector(".row.cancelled"))).toBe("17.01 S 172 Koskela Peruttu, Kalusto");
+        const row = shown.shadowRoot!.querySelector<HTMLElement>(".row.cancelled")!;
+        expect(text(row)).toBe("Peruttu 17.01 S 172 Koskela");
+        expect(row.querySelector(".time")!.classList.contains("struck")).toBe(true);
+        row.click();
+        await shown.updateComplete;
+        expect(text(shown.shadowRoot!.querySelector(".details"))).toBe("S 172 Koskela Tila Peruttu, Kalusto Aikataulu 17.01");
 
         const hidden = await card(hass({ "sensor.kauppatori": list }), { show_cancelled: false });
         expect(hidden.shadowRoot!.querySelector(".row.cancelled")).toBeNull();
@@ -403,21 +424,21 @@ describe("departures-card", () => {
         expect(full.shadowRoot!.querySelector("ha-card")?.classList.contains("full")).toBe(true);
     });
 
-    it("takes a whole section by default and is never narrower than three quarters of one", async () => {
+    it("takes a whole section by default and is never narrower", async () => {
         const state = hass({ "sensor.kauppatori": [departure("a", 5)] });
         const element = await card(state, { entities: ["sensor.kauppatori"] });
-        expect(element.getGridOptions()).toEqual({ columns: 12, min_columns: 9, rows: "auto", min_rows: 4 });
+        expect(element.getGridOptions()).toEqual({ columns: 12, min_columns: 12, rows: "auto", min_rows: 3 });
     });
 
-    // Two stops one above the other need 472 px, 8 rows, and side by side 248 px, 4 rows. 23 columns can be 595.6 px of
+    // Two stops one above the other need 344 px, 6 rows, and side by side 184 px, 3 rows. 23 columns can be 595.6 px of
     // card and 24 columns 622, around the 620 where two stops go side by side.
     it.each<[string, Partial<DeparturesCardConfig>, number]>([
-        ["a whole section", {}, 8],
-        ["23 columns", { grid_options: { columns: 23 } }, 8],
-        ["24 columns", { grid_options: { columns: 24 } }, 4],
-        ["24 columns in the older form", { layout_options: { grid_columns: 8 } }, 4],
-        ["the full width, whose columns aren't known", { grid_options: { columns: "full" } }, 8],
-        ["24 columns with one list for all", { grid_options: { columns: 24 }, combine: true }, 4],
+        ["a whole section", {}, 6],
+        ["23 columns", { grid_options: { columns: 23 } }, 6],
+        ["24 columns", { grid_options: { columns: 24 } }, 3],
+        ["24 columns in the older form", { layout_options: { grid_columns: 8 } }, 3],
+        ["the full width, whose columns aren't known", { grid_options: { columns: "full" } }, 6],
+        ["24 columns with one list for all", { grid_options: { columns: 24 }, combine: true }, 3],
     ])("counts two stops side by side only when its columns keep them so at their narrowest: %s", async (_, config, rows) => {
         const state = hass({ "sensor.east": [departure("a", 5)], "sensor.west": [departure("b", 5)] });
         const element = await card(state, { entities: ["sensor.east", "sensor.west"], ...config });
@@ -427,14 +448,14 @@ describe("departures-card", () => {
     it("puts a third stop under a pair side by side", async () => {
         const state = hass({ "sensor.a": [departure("a", 5)], "sensor.b": [departure("b", 5)], "sensor.c": [departure("c", 5)] });
         const element = await card(state, { entities: ["sensor.a", "sensor.b", "sensor.c"], grid_options: { columns: 24 } });
-        // 34 + 27 + 2 × 187 = 435 px.
-        expect(element.getGridOptions().min_rows).toBe(7);
+        // 34 + 27 + 2 × 123 = 307 px.
+        expect(element.getGridOptions().min_rows).toBe(5);
     });
 
     // Every text the card can cut short carries its own text as a tooltip, in every state, so it shows in full when the
     // mouse is over it whenever it is cut: the title, the attribution, the stop's name, subtitle and notices, the next
-    // departure's destination and notice, and the later departures' destinations and what they say in words. The
-    // heading itself names the sensor it opens.
+    // departure's destination and the later departures' destinations. A departure's notice is in its popup, and the
+    // sign that tells of it carries it as a tooltip too. The heading itself names the sensor it opens.
     const kauppatori = { entity: "sensor.kauppatori", name: "Kauppatori", subtitle: "keskustaan" };
     const asema = { entity: "sensor.works", name: "Asema" };
     it.each<
@@ -538,11 +559,10 @@ describe("departures-card", () => {
         expect(heading.querySelector(".name")?.getAttribute("title")).toBe(name);
         expect(heading.querySelector(".subtitle")?.getAttribute("title") ?? null).toBe(subtitle);
         const titles = (selector: string) => [...root.querySelectorAll(selector)].map((element) => element.getAttribute("title"));
-        const words = (key: string) => translate("fi", key);
         const stopNotices = ["Pysäkki siirretty", ...(config.combine ? ["Ratatyöt. Junat korvataan busseilla."] : [])];
         expect(titles(".stop-notice")).toEqual(shown ? stopNotices : []);
-        expect(titles(".next .meta .notice")).toEqual(shown ? ["Lähtee laiturilta 2"] : []);
-        expect(titles(".rows .status")).toEqual(shown ? [words("common.cancelled"), `${words("common.arrived")}, Kiertotie`] : []);
+        expect(titles(".next .direction")).toEqual(shown ? ["Lähtee laiturilta 2"] : []);
+        expect(titles(".rows .direction")).toEqual(shown ? ["Kiertotie"] : []);
         const destinations = titles(".rows .headsign");
         expect(destinations).toEqual(shown ? [...(config.combine ? ["Koskela"] : []), "Pasila", "Koskela"] : []);
     });
@@ -587,24 +607,23 @@ describe("the card's height", () => {
         expect(element.shadowRoot!.querySelector("ha-card")?.getAttribute("style") ?? "").toBe(style);
     });
 
-    // The border and padding (34 px), a title on one line (32), the attribution (27) and, split as they may be at the
-    // narrowest the columns get, every stop's heading and next departure (106) with the first row after them on its two
-    // lines (81), and the divider between stops (37).
+    // The border and padding (34 px), a title on one line (32), the attribution (27), every stop's heading and next
+    // departure (74) with the divider and the first row after them (49), and the divider between stops (37).
     it.each([
-        ["one stop", {}, 248, 4],
-        ["a title", { title: "Lähdöt" }, 280, 5],
-        ["only the next departure", { departures: 1 }, 167, 3],
-        ["two stops", { entities: ["sensor.kauppatori", "sensor.works"] }, 472, 8],
-        ["two stops and a title", { title: "Lähdöt", entities: ["sensor.kauppatori", "sensor.works"] }, 504, 8],
-        ["two stops in one list", { entities: ["sensor.kauppatori", "sensor.works"], combine: true }, 248, 4],
-        ["two stops in one list and a title", { title: "Lähdöt", entities: ["sensor.kauppatori", "sensor.works"], combine: true }, 280, 5],
+        ["one stop", {}, 184, 3],
+        ["a title", { title: "Lähdöt" }, 216, 4],
+        ["only the next departure", { departures: 1 }, 135, 3],
+        ["two stops", { entities: ["sensor.kauppatori", "sensor.works"] }, 344, 6],
+        ["two stops and a title", { title: "Lähdöt", entities: ["sensor.kauppatori", "sensor.works"] }, 376, 6],
+        ["two stops in one list", { entities: ["sensor.kauppatori", "sensor.works"], combine: true }, 184, 3],
+        ["two stops in one list and a title", { title: "Lähdöt", entities: ["sensor.kauppatori", "sensor.works"], combine: true }, 216, 4],
         [
             "two stops in one list, only the next departure",
             { departures: 1, entities: ["sensor.kauppatori", "sensor.works"], combine: true },
-            167,
+            135,
             3,
         ],
-        ["two stops, only their next departures", { departures: 1, entities: ["sensor.kauppatori", "sensor.works"] }, 310, 5],
+        ["two stops, only their next departures", { departures: 1, entities: ["sensor.kauppatori", "sensor.works"] }, 246, 4],
     ])("is never held lower than the next departure and one row of every stop need, with %s", async (_name, extra, minimum, rows) => {
         const state = hass({ "sensor.kauppatori": [departure("a", 11)], "sensor.works": [departure("b", 12)] });
         const element = await card(state, { ...extra, height: 100 });
@@ -624,8 +643,8 @@ describe("the card's height", () => {
         expect([...held.children].map((child) => child.className)).toEqual(["card-title", "sections", "attribution"]);
         const sections = [...held.querySelectorAll(".sections > section")];
         expect(sections.map((section) => [...section.children].map((child) => child.classList[0]))).toEqual([
-            ["heading", "next", "rows"],
-            ["heading", "stop-notice", "next", "rows"],
+            ["heading", "next", "rule", "rows"],
+            ["heading", "stop-notice", "next", "rule", "rows"],
         ]);
         expect(sections.every((section) => section.querySelector(".rows > .row"))).toBe(true);
         const auto = (await card(state, config)).shadowRoot!.querySelector("ha-card")!;
@@ -1067,69 +1086,27 @@ describe("redrawing for a new hass", () => {
     });
 });
 
-describe("splitting a departure onto two lines", () => {
-    // happy-dom lays nothing out, so each line is drawn from 0 to ONE_LINE, and its parts, while the card measures, end
-    // where its width on one line says.
-    const ONE_LINE = 300;
-    // What a stop whose rows scroll gives up of their width, to the scrollbar and the room beside it.
-    const SCROLLBAR = 20;
-    const natural = new Map<Element, number>();
-    let cardWidth = 340;
-    let splitWhileMeasuring = false;
-    const own = (name: string) => Object.getOwnPropertyDescriptor(HTMLElement.prototype, name);
-    const saved = { clientWidth: own("clientWidth"), getBoundingClientRect: own("getBoundingClientRect") };
-    const isLine = (element: Element | null) => !!element?.matches(".next, .row");
+describe("a held stop's scrollbar", () => {
+    const saved = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
 
     beforeEach(() => {
         vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
-        natural.clear();
-        cardWidth = 340;
-        splitWhileMeasuring = false;
-        Object.defineProperty(HTMLElement.prototype, "clientWidth", {
-            configurable: true,
-            get(this: HTMLElement) {
-                return this.tagName === "HA-CARD" ? cardWidth : ONE_LINE;
-            },
-        });
-        Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
-            configurable: true,
-            writable: true,
-            value(this: HTMLElement) {
-                let right = 0;
-                if (isLine(this)) {
-                    right = ONE_LINE - (this.closest(".rows.scrolls") ? SCROLLBAR : 0);
-                } else if (isLine(this.parentElement) && this.closest("ha-card")?.hasAttribute("data-measuring")) {
-                    splitWhileMeasuring ||= this.parentElement!.classList.contains("split");
-                    right = natural.get(this.parentElement!) ?? ONE_LINE - SCROLLBAR;
-                }
-                return { left: 0, right, width: right, top: 0, bottom: 0, height: 0 } as DOMRect;
-            },
-        });
+        // happy-dom lays nothing out, and a card with no width marks nothing.
+        Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 340 });
     });
 
     afterEach(() => {
-        for (const [name, descriptor] of Object.entries(saved)) {
-            if (descriptor) {
-                Object.defineProperty(HTMLElement.prototype, name, descriptor);
-            } else {
-                delete (HTMLElement.prototype as unknown as Record<string, unknown>)[name];
-            }
+        if (saved) {
+            Object.defineProperty(HTMLElement.prototype, "clientWidth", saved);
+        } else {
+            delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientWidth;
         }
         vi.useRealTimers();
         document.body.innerHTML = "";
     });
 
     async function stop(config: Partial<DeparturesCardConfig> = {}): Promise<DeparturesCard> {
-        return card(
-            hass({
-                "sensor.kauppatori": [
-                    departure("a", 4, { headsign: "Kivisalmi-Keskusta" }),
-                    departure("b", 12, { notice: "Kulkee poikkeusreittiä katutöiden vuoksi" }),
-                    departure("c", 20),
-                ],
-            }),
-            config,
-        );
+        return card(hass({ "sensor.kauppatori": [departure("a", 4), departure("b", 12), departure("c", 20)] }), config);
     }
 
     /** Gives a stop's rows a height of 100 and content as tall as `content` says each time it is read. */
@@ -1140,68 +1117,34 @@ describe("splitting a departure onto two lines", () => {
         return rows;
     }
 
-    function lines(element: DeparturesCard): HTMLElement[] {
-        return [...element.shadowRoot!.querySelectorAll<HTMLElement>(".next, .row")];
-    }
+    const mark = (element: DeparturesCard) => (element as unknown as { markScrollers(): void }).markScrollers();
 
-    function split(element: DeparturesCard): string[] {
-        (element as unknown as { splitLines(): void }).splitLines();
-        return lines(element).map((line) => (line.classList.contains("split") ? "split" : "one line"));
-    }
-
-    // Which lines are wider on one line than they are drawn, the next departure first.
-    it.each<[string, boolean[], string[]]>([
-        ["every one fits", [false, false, false], ["one line", "one line", "one line"]],
-        ["the next departure doesn't fit", [true, false, false], ["split", "one line", "one line"]],
-        ["a later departure doesn't fit", [false, true, false], ["one line", "split", "one line"]],
-        ["none fits", [true, true, true], ["split", "split", "split"]],
-    ])("keeps a departure on one line while it fits, and splits it when %s", async (_name, over, expected) => {
-        const element = await stop();
-        lines(element).forEach((line, index) => natural.set(line, ONE_LINE + (over[index] ? 0.4 : 0)));
-        expect(split(element)).toEqual(expected);
-        // A line already split is measured on one line again, so it goes back to one line when it fits once more.
-        lines(element).forEach((line) => natural.set(line, ONE_LINE));
-        expect(split(element)).toEqual(["one line", "one line", "one line"]);
-        expect(splitWhileMeasuring).toBe(false);
-    });
-
-    // The second departure fits its row's whole width, but not what a scrollbar and the room beside it leave.
-    it.each<[string, Partial<DeparturesCardConfig>, number, boolean, string]>([
-        ["whose rows fit", { height: 300 }, 100, false, "one line"],
-        ["whose rows scroll", { height: 300 }, 140, true, "split"],
-        ["that isn't held to a height", {}, 140, false, "one line"],
-    ])("makes room for a scrollbar only in a stop that scrolls, as in one %s", async (_name, config, content, scrolls, expected) => {
+    it.each<[string, Partial<DeparturesCardConfig>, number, boolean]>([
+        ["whose rows fit", { height: 300 }, 100, false],
+        ["whose rows scroll", { height: 300 }, 140, true],
+        ["that isn't held to a height", {}, 140, false],
+    ])("makes room for a scrollbar only in a stop that scrolls, as in one %s", async (_name, config, content, scrolls) => {
         const element = await stop(config);
         const rows = scroller(element, () => content);
-        natural.set(lines(element)[1], ONE_LINE - SCROLLBAR / 2);
-        expect(split(element)).toEqual(["one line", expected, "one line"]);
+        mark(element);
         expect(rows.classList.contains("scrolls")).toBe(scrolls);
     });
 
-    it("measures a stop at its whole width each time, so rows split by a scrollbar don't keep it scrolling", async () => {
-        const element = await stop({ height: 300 });
-        // The rows fit on one line each, and scroll only once one of them is split.
+    it("judges a stop at its whole width each time, so rows made taller by a scrollbar don't keep it scrolling", async () => {
+        const element = await stop({ height: 300, full_texts: true });
+        // With the scrollbar's room gone a destination wraps, and the rows are 30 px taller.
         let more = 60;
-        const rows = scroller(element, (part) => 100 + more + (part.querySelector(".split") ? 30 : 0));
-        natural.set(lines(element)[1], ONE_LINE - SCROLLBAR / 2);
-        expect(split(element)).toEqual(["one line", "split", "one line"]);
+        const rows = scroller(element, (part) => 100 + more + (part.classList.contains("scrolls") ? 30 : 0));
+        mark(element);
         expect(rows.classList.contains("scrolls")).toBe(true);
         more = 0;
-        expect(split(element)).toEqual(["one line", "one line", "one line"]);
+        mark(element);
         expect(rows.classList.contains("scrolls")).toBe(false);
-    });
-
-    it("shows no scrollbar in a stop measured at its whole width, as rows still drawn split may scroll", () => {
-        const css = [(customElements.get("departures-card") as unknown as { styles: unknown }).styles]
-            .flat(3)
-            .map((style) => String((style as { cssText?: string }).cssText ?? ""))
-            .join("\n");
-        expect(css).toMatch(/ha-card\[data-measuring\] section > \.rows:not\(\.scrolls\) \{\s*overflow-y: hidden;/);
     });
 
     it("leaves a list scrolled where it was", async () => {
         const element = await stop({ height: 300 });
-        // Measured at its whole width the list is shorter for a moment, which scrolls it back as a browser would.
+        // Judged at its whole width the list is shorter for a moment, which scrolls it back as a browser would.
         let top = 0;
         const rows = scroller(element, (part) => {
             const content = part.classList.contains("scrolls") ? 200 : 140;
@@ -1209,97 +1152,164 @@ describe("splitting a departure onto two lines", () => {
             return content;
         });
         Object.defineProperty(rows, "scrollTop", { configurable: true, get: () => top, set: (value: number) => (top = value) });
-        split(element);
+        mark(element);
         top = 100;
-        split(element);
+        mark(element);
         expect(top).toBe(100);
     });
+});
 
-    it("splits a departure again after the card is drawn afresh", async () => {
-        const element = await stop();
-        natural.set(lines(element)[1], ONE_LINE + 40);
-        split(element);
-        // A departure cancelled since writes its row's class afresh, and the card measures it again once drawn.
-        element.hass = hass({
+describe("a departure's popup", () => {
+    beforeEach(() => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        document.body.innerHTML = "";
+    });
+
+    const flights = () => {
+        const state = hass({
             "sensor.kauppatori": [
-                departure("a", 4, { headsign: "Kivisalmi-Keskusta" }),
-                departure("b", 12, { notice: "Kulkee poikkeusreittiä katutöiden vuoksi", cancelled: true }),
-                departure("c", 20),
+                departure("a", 4, { mode: "plane", line: "AY9411", headsign: "Oulu", platform: "34A", notice: "Portille" }),
+                departure("b", 12, {
+                    mode: "plane",
+                    line: "SK9709",
+                    headsign: "Tukholma",
+                    platform: "13",
+                    realtime: true,
+                    scheduled: new Date(NOW + 2 * 60_000).toISOString(),
+                }),
             ],
         });
+        return state;
+    };
+
+    async function open(element: DeparturesCard, selector: string): Promise<HTMLElement> {
+        element.shadowRoot!.querySelector<HTMLElement>(selector)!.click();
         await element.updateComplete;
-        expect(lines(element)[1].classList.contains("cancelled")).toBe(true);
-        expect(lines(element).map((line) => line.classList.contains("split"))).toEqual([false, true, false]);
+        return element.shadowRoot!.querySelector<HTMLElement>(".details")!;
+    }
+
+    it("is empty until a departure is clicked", async () => {
+        const element = await card(flights(), {});
+        expect(text(element.shadowRoot!.querySelector(".details"))).toBe("");
     });
 
-    it("measures nothing while the card has no width", async () => {
-        const element = await stop();
-        cardWidth = 0;
-        lines(element).forEach((line) => natural.set(line, ONE_LINE + 40));
-        expect(split(element)).toEqual(["one line", "one line", "one line"]);
+    it("tells of a notice with the icon in the accent colour, and says it in the popup in the same colour", async () => {
+        const element = await card(flights(), {});
+        expect(element.shadowRoot!.querySelector(".next .direction")!.classList.contains("noted")).toBe(true);
+        expect(text(element.shadowRoot!.querySelector(".next"))).toBe("4 min AY9411 Oulu 34A");
+        const popup = await open(element, ".next");
+        expect(text(popup)).toBe("AY9411 Oulu Tila Portille Aikataulu 16.56 Portti 34A");
+        expect(text(popup.querySelector("dd .noted"))).toBe("Portille");
     });
 
-    it.each<[string, number, number, string]>([
-        ["a later departure within the slack", 2, ONE_LINE + 0.005, "one line"],
-        ["a later departure just past the slack", 2, ONE_LINE + 0.02, "split"],
-        ["the next departure just past the slack", 0, ONE_LINE + 0.02, "split"],
-        ["the next departure within the slack", 0, ONE_LINE + 0.005, "one line"],
-    ])("measures to a hundredth of a pixel, %s", async (_name, index, edge, expected) => {
-        const element = await stop();
-        natural.set(lines(element)[index], edge);
-        expect(split(element)[index]).toBe(expected);
+    it("shows a later departure's times with its delay coloured as on its row", async () => {
+        const element = await card(flights(), {});
+        expect(text(element.shadowRoot!.querySelector(".row"))).toBe("+10 min·13 17.04 SK9709 Tukholma");
+        const popup = await open(element, ".row");
+        expect(text(popup)).toBe("SK9709 Tukholma Aikataulu 16.54 Arvio 17.04 +10 min Portti 13");
+        expect(text(popup.querySelector(".late"))).toBe("+10 min");
     });
 
-    it("holds every line to its layout height while it measures, so nothing around the card moves", async () => {
-        const element = await stop();
-        const card = element.shadowRoot!.querySelector("ha-card")!;
-        const drawn = new Map(lines(element).map((line, index) => [line, ["76px", "64px", "32px"][index]]));
-        const real = window.getComputedStyle.bind(window);
-        vi.spyOn(window, "getComputedStyle").mockImplementation((target, pseudo) =>
-            drawn.has(target as HTMLElement) ? ({ height: drawn.get(target as HTMLElement) } as CSSStyleDeclaration) : real(target, pseudo),
+    it("shows a landed plane in green with its hall, which its row leaves out", async () => {
+        const state = hass({
+            "sensor.kauppatori": [
+                departure("a", 4),
+                departure("b", 2, { mode: "plane", headsign: "Malaga", platform: "2B", arrived: true }),
+            ],
+        });
+        state.states["sensor.kauppatori"]!.attributes.direction = "arrivals";
+        const element = await card(state, {});
+        const row = element.shadowRoot!.querySelector(".row.came-in")!;
+        expect(row.querySelector(".platform")).toBeNull();
+        const popup = await open(element, ".row.came-in");
+        expect(text(popup.querySelector(".arrived"))).toBe("Maassa");
+        expect(text(popup)).toBe("55 Malaga Tila Maassa Aikataulu 16.54 Aula 2B");
+    });
+
+    it("gives a departure with a notice and no direction icon an info sign", async () => {
+        const state = hass({ "sensor.kauppatori": [departure("a", 4), departure("b", 9, { notice: "Kiertotie" }), departure("c", 12)] });
+        const icons = [...(await card(state, {})).shadowRoot!.querySelectorAll(".row")].map((row) =>
+            row.querySelector(".direction")?.getAttribute("icon"),
         );
-        const held: string[] = [];
-        for (const line of lines(element)) {
-            const box = line.getBoundingClientRect.bind(line);
-            line.getBoundingClientRect = () => {
-                if (card.hasAttribute("data-measuring")) {
-                    held.push(line.style.height);
-                }
-                return box();
-            };
-        }
-        split(element);
-        vi.restoreAllMocks();
-        expect(held).toEqual(["76px", "64px", "32px"]);
-        expect(lines(element).map((line) => line.style.height)).toEqual(["", "", ""]);
+        expect(icons).toEqual(["mdi:information-outline", undefined]);
     });
 
-    it("sizes a row with its padding, which measuring changes, as its height is held at the height it is drawn at", () => {
-        const css = [(customElements.get("departures-card") as unknown as { styles: unknown }).styles]
-            .flat(3)
-            .map((style) => String((style as { cssText?: string }).cssText ?? ""))
-            .join("\n");
-        expect(css).toMatch(/\n\s*\.row \{[^}]*box-sizing: border-box;/);
-    });
-
-    it("draws a line split again as it was measured when the card is drawn afresh, before it measures again", async () => {
-        const element = await stop();
-        natural.set(lines(element)[1], ONE_LINE + 40);
-        split(element);
-        // A render that rewrites the row's class, as a cancellation does, keeps its split rather than dropping it.
-        (element as unknown as { splitLines(): void }).splitLines = () => {};
-        element.hass = hass({
-            "sensor.kauppatori": [
-                departure("a", 4, { headsign: "Kivisalmi-Keskusta" }),
-                departure("b", 12, { notice: "Kulkee poikkeusreittiä katutöiden vuoksi", cancelled: true }),
-                departure("c", 20),
-            ],
-        });
+    it("closes when its departure leaves the list", async () => {
+        const element = await card(flights(), {});
+        const popup = await open(element, ".row");
+        expect(popup.hasAttribute("data-showing")).toBe(true);
+        element.hass = hass({ "sensor.kauppatori": [departure("a", 4)] });
         await element.updateComplete;
-        expect(lines(element).map((line) => [line.classList.contains("cancelled"), line.classList.contains("split")])).toEqual([
-            [false, false],
-            [true, true],
-            [false, false],
-        ]);
+        expect(popup.hasAttribute("data-showing")).toBe(false);
+        await element.updateComplete;
+        expect(text(popup)).toBe("");
+    });
+
+    it("closes from its own line, as a key press there does", async () => {
+        const element = await card(flights(), {});
+        const popup = await open(element, ".row");
+        await open(element, ".row");
+        expect(popup.hasAttribute("data-showing")).toBe(false);
+        expect(text(popup)).toBe("");
+    });
+
+    it("doesn't open again from the click that closed it", async () => {
+        const element = await card(flights(), {});
+        const popup = await open(element, ".row");
+        // A pointer closes the popup before its click arrives.
+        popup.hidePopover();
+        await open(element, ".row");
+        expect(popup.hasAttribute("data-showing")).toBe(false);
+        await new Promise((resolve) => setTimeout(resolve));
+        await open(element, ".row");
+        expect(popup.hasAttribute("data-showing")).toBe(true);
+    });
+
+    it("moves to another line without opening twice", async () => {
+        const element = await card(flights(), {});
+        await open(element, ".row");
+        const popup = await open(element, ".next");
+        expect(popup.hasAttribute("data-showing")).toBe(true);
+        expect(text(popup)).toBe("AY9411 Oulu Tila Portille Aikataulu 16.56 Portti 34A");
+    });
+
+    it("closes from its close button", async () => {
+        const element = await card(flights(), {});
+        const popup = await open(element, ".row");
+        const close = popup.querySelector<HTMLElement>(".close")!;
+        expect(close.getAttribute("aria-label")).toBe("Sulje");
+        close.click();
+        expect(popup.hasAttribute("data-showing")).toBe(false);
+    });
+
+    it("says that the large departure is on time, which a row leaves to its live icon", async () => {
+        const live = (id: string, minutes: number) =>
+            departure(id, minutes, { realtime: true, scheduled: new Date(NOW + minutes * 60_000).toISOString(), platform: "3" });
+        const element = await card(hass({ "sensor.kauppatori": [live("a", 4), live("b", 9), departure("c", 12)] }), {});
+        expect(text(element.shadowRoot!.querySelector(".next .meta"))).toBe("Aikataulussa·3");
+        expect(text(element.shadowRoot!.querySelector(".row .end"))).toBe("3");
+        const timetable = await card(hass({ "sensor.kauppatori": [departure("c", 12)] }), {});
+        expect(timetable.shadowRoot!.querySelector(".next .on-time")).toBeNull();
+    });
+
+    it("closes when anything scrolls", async () => {
+        const element = await card(flights(), {});
+        const popup = await open(element, ".row");
+        window.dispatchEvent(new Event("scroll"));
+        expect(popup.hasAttribute("data-showing")).toBe(false);
+    });
+
+    it("isn't there without the Popover API, and a click does nothing", async () => {
+        delete popovers.showPopover;
+        delete popovers.hidePopover;
+        const element = await card(flights(), {});
+        expect(element.shadowRoot!.querySelector(".details")).toBeNull();
+        element.shadowRoot!.querySelector<HTMLElement>(".row")!.click();
+        await element.updateComplete;
+        expect(element.shadowRoot!.querySelector(".details")).toBeNull();
     });
 });

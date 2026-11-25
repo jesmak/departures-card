@@ -28,6 +28,11 @@
         "arrived": "Saapunut",
         "departing": "Lähtevä",
         "arriving": "Saapuva",
+        "status": "Tila",
+        "scheduled": "Aikataulu",
+        "estimated": "Arvio",
+        "on_time": "Aikataulussa",
+        "close": "Sulje",
         "entity_unavailable": "{entity} ei ole juuri nyt saatavilla"
     },
     "editor": {

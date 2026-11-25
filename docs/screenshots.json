@@ -323,7 +323,7 @@
         },
         {
             "name": "narrow",
-            "width": 240,
+            "width": 320,
             "card": {
                 "type": "custom:departures-card",
                 "entities": ["sensor.hameenkatu_tke0002"]

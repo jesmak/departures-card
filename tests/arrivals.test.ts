@@ -189,7 +189,7 @@ describe("arrivals and directions", () => {
         ]);
     });
 
-    it("shows a landed flight's delay and other notice", async () => {
+    it("shows a landed flight's delay on its row, and its other notice and hall in its popup", async () => {
         const late = flight("ay5", -12, {
             arrived: true,
             realtime: true,
@@ -198,8 +198,14 @@ describe("arrivals and directions", () => {
             platform: "2A",
         });
         const state = hass({ "sensor.saapuvat": { departures: [late, flight("ay6", 5)], direction: "arrivals" } });
-        const row = (await card(state, { entities: ["sensor.saapuvat"] })).shadowRoot!.querySelector(".row.came-in");
-        expect(text(row)).toBe("11.48 AY5 Oulu +13 min Maassa Matkatavarat myöhässä Aula 2A");
+        const element = await card(state, { entities: ["sensor.saapuvat"] });
+        const row = element.shadowRoot!.querySelector<HTMLElement>(".row.came-in")!;
+        expect(text(row)).toBe("+13 min 11.48 AY5 Oulu");
+        row.click();
+        await element.updateComplete;
+        expect(text(element.shadowRoot!.querySelector(".details"))).toBe(
+            "AY5 Oulu Tila Maassa, Matkatavarat myöhässä Aikataulu 11.35 Arvio 11.48 +13 min Aula 2A",
+        );
     });
 
     it("lists only the two latest that have landed, within the count", async () => {
@@ -228,20 +234,20 @@ describe("arrivals and directions", () => {
         });
         const root = (await card(state, { entities: ["sensor.saapuvat", "sensor.toiset"], combine: true, departures: 10 })).shadowRoot!;
         expect([...root.querySelectorAll(".row .badge")].map(text)).toEqual(["AY3", "AY4"]);
-        expect(text(root.querySelector(".row.cancelled"))).toBe("11.55 AY4 Oulu Peruttu");
+        expect(text(root.querySelector(".row.cancelled"))).toBe("Peruttu 11.55 AY4 Oulu");
         expect(root.querySelector(".row.cancelled.came-in")).toBeNull();
     });
 
-    it("shows a landed flight with its landing time, dimmed and in the hall, and never large", async () => {
+    it("shows a landed flight with its landing time, dimmed with a green icon, and never large", async () => {
         const landed = flight("ay5", -12, { arrived: true, platform: "2A", notice: null });
         const state = hass({ "sensor.saapuvat": { departures: [landed, flight("ay6", 5, { platform: "2B" })], direction: "arrivals" } });
         const root = (await card(state, { entities: ["sensor.saapuvat"] })).shadowRoot!;
         expect(text(root.querySelector(".next .headsign"))).toBe("Oulu");
         expect(text(root.querySelector(".next .countdown"))).toBe("5 min");
-        expect(text(root.querySelector(".next .platform"))).toBe("Aula 2B");
+        // A hall isn't on a line, only in its popup.
+        expect(root.querySelector(".next .platform")).toBeNull();
         const row = root.querySelector(".row.came-in");
-        expect(text(row)).toBe("11.48 AY5 Oulu Maassa Aula 2A");
-        expect(row?.querySelector(".arrived")).not.toBeNull();
+        expect(text(row)).toBe("11.48 AY5 Oulu");
         expect(row?.querySelector(".alert")).toBeNull();
     });
 
@@ -274,9 +280,11 @@ describe("arrivals and directions", () => {
         expect(root.querySelectorAll("section")).toHaveLength(1);
         expect(text(root.querySelector(".heading"))).toBe("Esimerkkilä");
         expect(text(root.querySelector(".next .badge")), "an arrival is the soonest").toBe("AY2");
-        expect(text(root.querySelector(".next .platform"))).toBe("Aula 2A");
+        expect(root.querySelector(".next .platform")).toBeNull();
         expect([...root.querySelectorAll(".row .badge")].map(text)).toEqual(["AY1", "AY3", "AY4"]);
-        expect([...root.querySelectorAll(".row .platform")].map(text)).toEqual(["Portti 12", "Portti 14", "Aula 2B"]);
+        // The departures' gates, named once at the end of the divider. The arrivals' halls are in their popups.
+        expect([...root.querySelectorAll(".row .platform")].map(text)).toEqual(["12", "14"]);
+        expect(text(root.querySelector(".rule"))).toBe("Portti");
     });
 
     // A single list's heading and empty text, from the directions its sensors state and whether they can be shown.

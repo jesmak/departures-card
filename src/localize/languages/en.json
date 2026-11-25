@@ -28,6 +28,11 @@
         "arrived": "Arrived",
         "departing": "Departing",
         "arriving": "Arriving",
+        "status": "Status",
+        "scheduled": "Scheduled",
+        "estimated": "Estimate",
+        "on_time": "On time",
+        "close": "Close",
         "entity_unavailable": "{entity} isn't available right now"
     },
     "editor": {
