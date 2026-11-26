@@ -252,10 +252,11 @@ for free, and the format is meant to stay stable. New optional fields are added 
 ## Translating
 
 The card's texts are in `src/localize/languages/`, one JSON file per language, named by its language code, such as
-`en.json` and `fi.json`. To add a language, copy `en.json` to the new language's code, such as `sv.json`, and translate the values.
-Nothing else needs changing. The card finds the file by itself and uses it when Home Assistant is set to that
-language. A text left out falls back to English. Names, destinations and notices come from the integrations, in the
-language they were set up with.
+`en.json` and `fi.json`. To add a language, copy `en.json` to the new language's code, such as `sv.json`, and translate
+the values. A file may name a region, such as `pt-br.json`. It is used for `pt-BR`, falling back to a file for the
+language alone (`pt.json`), and then to English. Nothing else needs changing. The card finds the file by itself and
+uses it when Home Assistant is set to that language. A text left out falls back to English. Names, destinations and
+notices come from the integrations, in the language they were set up with.
 
 ## Development
 
